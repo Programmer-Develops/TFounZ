@@ -15,7 +15,7 @@
   - **MongoDB Aggregation Pipeline** attendance report (first join time, last leave time, total minutes, raised hands, messages, rapid-fire score) + CSV export
 - **AI Talk Show Stage ("Chai with AI")**:
   - Split-screen TV couch pairing your live camera with an audio-reactive **2D Canvas Expressive Studio Avatar** (`glam`, `baritone`, `gamer`, `anime`, `panel`, `studio`)
-  - Live voice & text banter powered by **Gemini** (`gemini-3.5-flash-lite`) with emotion cues, TV lower-third chyrons, and 60-second **Rapid-Fire Round**
+  - Live voice & text banter powered by **Gemini** (`gemini-flash-lite-latest` with automatic multi-model 503 circuit-breaker) with emotion cues, TV lower-third chyrons, and 60-second **Rapid-Fire Round**
   - Web Audio synthesized studio soundboard (`Applause`, `Laugh`, `Drumroll`, `Ba-Dum-Tss`, `Sip Chai`, `Buzzer`)
   - Composite `1280x720` Broadcast Clip Recorder (`MediaRecorder`) that captures both stage panes + ON AIR overlays and transfers straight into Post-Production
 - **SounZ AI Audio & Voice Lab**:
@@ -33,7 +33,7 @@
 - **External AI Services** (server-side proxy via `.env`):
   - **Filmy AI**: `https://shantanu-pandya-filmy-ai-api.hf.space`
   - **SounZ AI**: `https://shantanu-pandya-sounz-ai.hf.space`
-  - **Gemini API**: `gemini-3.5-flash-lite`
+  - **Gemini API**: `gemini-flash-lite-latest` (with automatic fallback chain)
 
 ---
 
@@ -51,7 +51,7 @@ JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
 CLIENT_URL=http://localhost:5173
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_MODEL=gemini-flash-lite-latest
 FILMY_AI_URL=https://shantanu-pandya-filmy-ai-api.hf.space
 SOUNZ_AI_URL=https://shantanu-pandya-sounz-ai.hf.space
 ```

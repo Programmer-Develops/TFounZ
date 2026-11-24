@@ -2,12 +2,22 @@ import env from '../config/env.js';
 
 const VALID_EMOTIONS = new Set(['neutral', 'laugh', 'shock', 'roast', 'applause', 'think']);
 const VALID_SFX = new Set(['', 'applause', 'laugh', 'drumroll', 'rimshot', 'sip_tea', 'buzzer']);
-const DEPRECATED_MODELS = new Set(['gemini-2.5-flash', 'models/gemini-2.5-flash']);
+const DEPRECATED_MODELS = new Set([
+  'gemini-2.5-flash',
+  'models/gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'models/gemini-2.5-flash-lite',
+]);
 const MODEL_FALLBACK_CHAIN = [
-  'gemini-3.5-flash-lite',
   'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
   'gemini-3.8-flash',
 ];
+
+// Per-model circuit breaker: temporarily deprioritize models hitting 503/429/timeout
+const COOLDOWN_MS = 120_000;
+const modelCooldownUntil = new Map();
 
 function isGeminiConfigured() {
   return (
@@ -22,10 +32,17 @@ function redactKey(text) {
 
 function getCandidateModels() {
   const configured = (env.geminiModel || '').trim().replace(/^models\//, '');
-  const list = [configured, ...MODEL_FALLBACK_CHAIN]
+  const unique = [...new Set([configured, ...MODEL_FALLBACK_CHAIN])]
     .filter(Boolean)
     .filter((m) => !DEPRECATED_MODELS.has(m));
-  return [...new Set(list)];
+
+  const now = Date.now();
+  const healthy = unique.filter((m) => (modelCooldownUntil.get(m) || 0) <= now);
+  const cooling = unique
+    .filter((m) => (modelCooldownUntil.get(m) || 0) > now)
+    .sort((a, b) => (modelCooldownUntil.get(a) || 0) - (modelCooldownUntil.get(b) || 0));
+
+  return [...healthy, ...cooling];
 }
 
 async function callGeminiJson({
@@ -36,7 +53,8 @@ async function callGeminiJson({
 }) {
   const models = getCandidateModels();
 
-  for (const model of models) {
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
       model
     )}:generateContent?key=${encodeURIComponent(env.geminiApiKey)}`;
@@ -57,15 +75,20 @@ async function callGeminiJson({
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(12000),
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errText = await res.text().catch(() => '');
+        if (res.status === 503 || res.status === 429 || res.status === 404) {
+          modelCooldownUntil.set(model, Date.now() + COOLDOWN_MS);
+        }
         console.warn(
-          `Gemini model ${model} HTTP ${res.status}: ${redactKey(errText).slice(0, 160)}`
+          `[Gemini] ${model} returned HTTP ${res.status}; cooling down 2m and rotating to next model.`
         );
+        if (i < models.length - 1) {
+          await new Promise((r) => setTimeout(r, 250));
+        }
         continue;
       }
 
@@ -75,9 +98,13 @@ async function callGeminiJson({
       const match = cleaned.match(/\{[\s\S]*\}/);
       const parsed = JSON.parse(match ? match[0] : cleaned);
 
+      modelCooldownUntil.delete(model);
       return { parsed, modelUsed: model };
     } catch (err) {
-      console.warn(`Gemini model ${model} failed:`, redactKey(err?.message || err));
+      modelCooldownUntil.set(model, Date.now() + COOLDOWN_MS);
+      console.warn(
+        `[Gemini] ${model} failed (${redactKey(err?.message || err)}); rotating to next model.`
+      );
     }
   }
 

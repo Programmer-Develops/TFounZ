@@ -24,7 +24,7 @@ const env = {
   jwtRefreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   clientUrl: stripTrailingSlash(process.env.CLIENT_URL) || 'http://localhost:5173',
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
-  geminiModel: (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim(),
+  geminiModel: (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim(),
   filmyAiUrl:
     stripTrailingSlash(process.env.FILMY_AI_URL) ||
     'https://shantanu-pandya-filmy-ai-api.hf.space',
