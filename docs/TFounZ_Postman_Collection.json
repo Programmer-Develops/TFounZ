@@ -1,0 +1,392 @@
+{
+  "info": {
+    "name": "TFounZ Studio API Collection",
+    "_postman_id": "a9d4a6b0-2026-4a7f-9b88-tfounz000001",
+    "description": "Complete REST API collection for TFounZ — AI Talk Show & MeetLite Video Studio (Auth, Meetings, Attendance Aggregation, Gemini AI Show, SounZ AI, Filmy AI, and Admin RBAC).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "meetingId", "value": "" },
+    { "key": "meetingCode", "value": "" },
+    { "key": "userId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Health & Presets",
+      "item": [
+        {
+          "name": "API Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health"
+          }
+        },
+        {
+          "name": "Get Talk Show Presets",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/meetings/presets"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Auth & JWT Refresh",
+      "item": [
+        {
+          "name": "Register Host Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "if (json?.data?.refreshToken) pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "if (json?.data?.user?._id) pm.collectionVariables.set('userId', json.data.user._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Show Host\",\n  \"email\": \"postman.host@tfounz.studio\",\n  \"password\": \"Password123!\",\n  \"role\": \"host\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "if (json?.data?.refreshToken) pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "if (json?.data?.user?._id) pm.collectionVariables.set('userId', json.data.user._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"host@tfounz.studio\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Get Current Profile (/me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "if (json?.data?.refreshToken) pm.collectionVariables.set('refreshToken', json.data.refreshToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Meetings & Attendance Aggregation",
+      "item": [
+        {
+          "name": "Create AI Talk Show",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.meeting?._id) pm.collectionVariables.set('meetingId', json.data.meeting._id);",
+                  "if (json?.data?.meeting?.code) pm.collectionVariables.set('meetingCode', json.data.meeting.code);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Chai with Karan AI — Demo Episode\",\n  \"description\": \"Testing MeetLite + Talk Show creation\",\n  \"showFormat\": \"chai-with-ai\",\n  \"mode\": \"ai-talkshow\"\n}"
+            },
+            "url": "{{baseUrl}}/api/meetings"
+          }
+        },
+        {
+          "name": "Get Meeting by Code",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/meetings/code/{{meetingCode}}"
+          }
+        },
+        {
+          "name": "Get My Show History (Aggregation)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/meetings/history"
+          }
+        },
+        {
+          "name": "Search Show Messages (Text Index)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/meetings/{{meetingId}}/messages?q=chai"
+          }
+        },
+        {
+          "name": "Get Attendance Report (MongoDB Aggregation)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/meetings/{{meetingId}}/attendance-report"
+          }
+        },
+        {
+          "name": "Remove Participant from Show",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/meetings/{{meetingId}}/remove-participant"
+          }
+        },
+        {
+          "name": "End Show / Update Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ended\"\n}"
+            },
+            "url": "{{baseUrl}}/api/meetings/{{meetingId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. AI Talk Show Host (Gemini)",
+      "item": [
+        {
+          "name": "Ask AI Host to Respond",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userMessage\": \"Hey Karan AI, what makes TFounZ better than a regular Zoom clone?\",\n  \"isRapidFire\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/ai-show/{{meetingId}}/respond"
+          }
+        },
+        {
+          "name": "Start 60s Rapid-Fire Round",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"Engineering College & Tech\"\n}"
+            },
+            "url": "{{baseUrl}}/api/ai-show/{{meetingId}}/rapid-fire"
+          }
+        },
+        {
+          "name": "Synthesize Live AI Speech via SounZ AI",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Welcome to Chai with Karan AI!\",\n  \"sfxCue\": \"applause\"\n}"
+            },
+            "url": "{{baseUrl}}/api/ai-show/{{meetingId}}/speak"
+          }
+        },
+        {
+          "name": "Generate AI Episode Summary & Filmy Prompt",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/ai-show/{{meetingId}}/summary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Filmy AI & SounZ AI Studio",
+      "item": [
+        {
+          "name": "Check AI Spaces Health",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/studio/health"
+          }
+        },
+        {
+          "name": "Get Live SounZ AI Voices Catalog",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/studio/voices"
+          }
+        },
+        {
+          "name": "Process Audio via SounZ AI",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" },
+                { "key": "instruction", "value": "Convert my voice to romantic hero and normalize loudness", "type": "text" },
+                { "key": "voiceId", "value": "romantic_hero", "type": "text" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/studio/sounz/process"
+          }
+        },
+        {
+          "name": "Produce Video via Filmy AI",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" },
+                { "key": "instruction", "value": "Remove background noise and add synchronized bottom subtitles", "type": "text" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/studio/filmy/process"
+          }
+        },
+        {
+          "name": "List My Production Jobs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/studio/jobs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Admin RBAC Routes",
+      "item": [
+        {
+          "name": "Platform Analytics (Admin Aggregation)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/stats"
+          }
+        },
+        {
+          "name": "List All Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/users"
+          }
+        },
+        {
+          "name": "Update User Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"host\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/users/{{userId}}/role"
+          }
+        },
+        {
+          "name": "Delete Meeting",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/meetings/{{meetingId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
