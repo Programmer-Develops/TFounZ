@@ -1,91 +1,89 @@
 const THEME_PALETTES = {
   glam: {
-    bgTop: '#241432',
-    bgBottom: '#0d0916',
-    suit: '#2e1640',
-    shirt: '#fdf4e7',
-    tie: '#f5b041',
-    skin: '#d99c72',
-    hair: '#1f1924',
-    accent: '#f5b041',
+    bgTop: '#161310',
+    bgBottom: '#08080A',
+    suit: '#221D18',
+    shirt: '#F3EFE6',
+    tie: '#C9A96E',
+    skin: '#C8946E',
+    hair: '#1B1817',
+    accent: '#C9A96E',
     glasses: true,
     prop: 'chai',
   },
   baritone: {
-    bgTop: '#2a131a',
-    bgBottom: '#0c080d',
-    suit: '#1d1c28',
-    shirt: '#f8fafc',
-    tie: '#e67e22',
-    skin: '#cfa17d',
-    hair: '#d5d8dc',
-    accent: '#e67e22',
+    bgTop: '#161113',
+    bgBottom: '#08080A',
+    suit: '#1B1A20',
+    shirt: '#F3EFE6',
+    tie: '#B8895C',
+    skin: '#BE8F6F',
+    hair: '#CFCBC4',
+    accent: '#C4934E',
     glasses: true,
     beard: true,
     prop: 'mic',
   },
   gamer: {
-    bgTop: '#2b0f22',
-    bgBottom: '#0a0812',
-    suit: '#181826',
-    shirt: '#ff4d6d',
+    bgTop: '#161013',
+    bgBottom: '#08080A',
+    suit: '#191920',
+    shirt: '#292228',
     tie: null,
-    skin: '#d99e78',
-    hair: '#14141d',
-    accent: '#ff4d6d',
+    skin: '#C89674',
+    hair: '#151519',
+    accent: '#C85E67',
     headphones: true,
-    prop: 'controller',
+    prop: 'mic',
   },
   anime: {
-    bgTop: '#0d2238',
-    bgBottom: '#070c16',
-    suit: '#101524',
-    shirt: '#1e293b',
-    tie: '#38bdf8',
-    skin: '#f4d3bd',
-    hair: '#eef6ff',
-    accent: '#38bdf8',
+    bgTop: '#0F1419',
+    bgBottom: '#08080A',
+    suit: '#141820',
+    shirt: '#1E242E',
+    tie: '#82A6BD',
+    skin: '#DEC2AE',
+    hair: '#ECEAE4',
+    accent: '#8FB4CB',
     shades: true,
-    prop: 'aura',
+    prop: 'mic',
   },
   panel: {
-    bgTop: '#0d2922',
-    bgBottom: '#080e12',
-    suit: '#122436',
-    shirt: '#eef6fa',
-    tie: '#2ee59d',
-    skin: '#cf956b',
-    hair: '#1b1d26',
-    accent: '#2ee59d',
+    bgTop: '#0F1513',
+    bgBottom: '#08080A',
+    suit: '#161E22',
+    shirt: '#F0ECE4',
+    tie: '#7DA88B',
+    skin: '#BD8A67',
+    hair: '#1A1A1E',
+    accent: '#7DA88B',
     prop: 'mic',
   },
   studio: {
-    bgTop: '#1f1436',
-    bgBottom: '#0a0814',
-    suit: '#2a1a4a',
-    shirt: '#f3e8ff',
-    tie: '#a855f7',
-    skin: '#dfb190',
-    hair: '#24182b',
-    accent: '#a855f7',
+    bgTop: '#141318',
+    bgBottom: '#08080A',
+    suit: '#1E1D24',
+    shirt: '#EFECE6',
+    tie: '#C9A96E',
+    skin: '#C89B7B',
+    hair: '#1E1B20',
+    accent: '#C9A96E',
     prop: 'mic',
   },
 };
 
-const EMOTION_BADGES = {
-  neutral: '🎙️ ON AIR',
-  laugh: '😂 HAHAHA!',
-  shock: '😲 NO WAY!',
-  roast: '🔥 ROASTED!',
-  applause: '👏 ICONIC!',
-  think: '🤔 HMMM...',
+const EMOTION_LABELS = {
+  neutral: 'STUDIO LIVE',
+  laugh: 'AMUSED',
+  shock: 'SURPRISED',
+  roast: 'SHARP TAKE',
+  applause: 'OVATION',
+  think: 'CONSIDERING',
 };
 
 export function drawStudioAvatar(ctx, width, height, state) {
   const {
     avatarStyle = 'glam',
-    hostName = 'Karan AI',
-    aiRole = 'host',
     emotion = 'neutral',
     mouthOpen = 0,
     isSpeaking = false,
@@ -94,82 +92,89 @@ export function drawStudioAvatar(ctx, width, height, state) {
 
   const palette = THEME_PALETTES[avatarStyle] || THEME_PALETTES.glam;
 
-  // 1. Studio Backdrop Gradient
+  // 1. Editorial Studio Backdrop
   const bg = ctx.createLinearGradient(0, 0, 0, height);
   bg.addColorStop(0, palette.bgTop);
   bg.addColorStop(1, palette.bgBottom);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, width, height);
 
-  // 2. Spotlight Halo
+  // Architectural Acoustic Slat Lines
+  ctx.strokeStyle = 'rgba(245, 242, 235, 0.032)';
+  ctx.lineWidth = 1;
+  for (let x = 32; x < width; x += 28) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+
+  // 2. Restrained Rim Spotlight
   const cx = width * 0.5;
-  const cy = height * 0.45;
-  const haloRadius = width * (0.34 + mouthOpen * 0.04);
-  const halo = ctx.createRadialGradient(cx, cy, 10, cx, cy, haloRadius);
-  halo.addColorStop(0, `${palette.accent}44`);
-  halo.addColorStop(0.6, `${palette.accent}12`);
+  const cy = height * 0.37;
+  const haloRadius = width * (0.31 + mouthOpen * 0.03);
+  const halo = ctx.createRadialGradient(cx, cy, 8, cx, cy, haloRadius);
+  halo.addColorStop(0, `${palette.accent}28`);
+  halo.addColorStop(0.55, `${palette.accent}0A`);
   halo.addColorStop(1, 'transparent');
   ctx.fillStyle = halo;
   ctx.fillRect(0, 0, width, height);
 
-  // 3. Audio Equalizer Bars on the Studio Wall
-  const barCount = 16;
-  const barW = 8;
+  // 3. Minimal Broadcast Audio Meter Bars
+  const barCount = 18;
+  const barW = 4;
   const gap = 14;
   const totalBarsW = barCount * (barW + gap);
   const startX = (width - totalBarsW) / 2;
-  ctx.fillStyle = `${palette.accent}55`;
+  ctx.fillStyle = `${palette.accent}52`;
   for (let i = 0; i < barCount; i++) {
     const wave = isSpeaking
-      ? Math.abs(Math.sin(tick * 0.16 + i * 0.65)) * (14 + mouthOpen * 42)
-      : 6 + Math.abs(Math.sin(tick * 0.04 + i * 0.5)) * 8;
+      ? Math.abs(Math.sin(tick * 0.16 + i * 0.6)) * (10 + mouthOpen * 36)
+      : 4 + Math.abs(Math.sin(tick * 0.035 + i * 0.45)) * 5;
     ctx.beginPath();
-    ctx.roundRect(startX + i * (barW + gap), height * 0.48 - wave / 2, barW, wave, 4);
+    ctx.roundRect(startX + i * (barW + gap), height * 0.41 - wave / 2, barW, wave, 2);
     ctx.fill();
   }
 
-  // Subtle floating idle motion
-  const bobY = Math.sin(tick * 0.05) * 3 + (isSpeaking ? -mouthOpen * 3 : 0);
+  const bobY = Math.sin(tick * 0.04) * 2.0 + (isSpeaking ? -mouthOpen * 2.2 : 0);
 
-  // 4. Couch / Chair Silhouette
-  ctx.fillStyle = '#1d1629';
+  // 4. Studio Chair Silhouette
+  ctx.fillStyle = '#141418';
   ctx.beginPath();
-  ctx.roundRect(width * 0.16, height * 0.62, width * 0.68, height * 0.38, 30);
+  ctx.roundRect(width * 0.2, height * 0.56, width * 0.6, height * 0.44, 16);
   ctx.fill();
-  ctx.strokeStyle = `${palette.accent}35`;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(245, 242, 235, 0.07)';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
-  // 5. Shoulders & Suit
+  // 5. Tailored Suit & Collar
   ctx.save();
-  ctx.translate(cx, height * 0.8 + bobY * 0.5);
-
+  ctx.translate(cx, height * 0.72 + bobY * 0.45);
   ctx.fillStyle = palette.suit;
   ctx.beginPath();
-  ctx.moveTo(-115, 70);
-  ctx.quadraticCurveTo(-105, -26, -32, -38);
-  ctx.lineTo(32, -38);
-  ctx.quadraticCurveTo(105, -26, 115, 70);
+  ctx.moveTo(-110, 72);
+  ctx.quadraticCurveTo(-102, -24, -30, -36);
+  ctx.lineTo(30, -36);
+  ctx.quadraticCurveTo(102, -24, 110, 72);
   ctx.closePath();
   ctx.fill();
 
-  // Shirt V-neck
   ctx.fillStyle = palette.shirt;
   ctx.beginPath();
-  ctx.moveTo(-26, -38);
-  ctx.lineTo(0, 38);
-  ctx.lineTo(26, -38);
+  ctx.moveTo(-24, -36);
+  ctx.lineTo(0, 34);
+  ctx.lineTo(24, -36);
   ctx.closePath();
   ctx.fill();
 
   if (palette.tie) {
     ctx.fillStyle = palette.tie;
     ctx.beginPath();
-    ctx.moveTo(-8, -32);
-    ctx.lineTo(8, -32);
-    ctx.lineTo(5, 36);
-    ctx.lineTo(0, 44);
-    ctx.lineTo(-5, 36);
+    ctx.moveTo(-7, -30);
+    ctx.lineTo(7, -30);
+    ctx.lineTo(4.5, 34);
+    ctx.lineTo(0, 42);
+    ctx.lineTo(-4.5, 34);
     ctx.closePath();
     ctx.fill();
   }
@@ -177,200 +182,169 @@ export function drawStudioAvatar(ctx, width, height, state) {
 
   // 6. Neck & Head
   const headX = cx;
-  const headY = height * 0.44 + bobY;
+  const headY = height * 0.365 + bobY;
 
-  // Neck
   ctx.fillStyle = palette.skin;
-  ctx.fillRect(headX - 18, headY + 46, 36, 40);
+  ctx.fillRect(headX - 16, headY + 46, 32, 38);
 
-  // Ears
-  ctx.fillStyle = palette.skin;
   ctx.beginPath();
-  ctx.arc(headX - 58, headY + 6, 12, 0, Math.PI * 2);
-  ctx.arc(headX + 58, headY + 6, 12, 0, Math.PI * 2);
+  ctx.arc(headX - 54, headY + 6, 11, 0, Math.PI * 2);
+  ctx.arc(headX + 54, headY + 6, 11, 0, Math.PI * 2);
   ctx.fill();
 
-  // Head Oval
-  ctx.fillStyle = palette.skin;
   ctx.beginPath();
-  ctx.ellipse(headX, headY, 56, 68, 0, 0, Math.PI * 2);
+  ctx.ellipse(headX, headY, 53, 65, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Hair
   ctx.fillStyle = palette.hair;
   ctx.beginPath();
-  ctx.ellipse(headX, headY - 40, 58, 32, 0, Math.PI, Math.PI * 2);
+  ctx.ellipse(headX, headY - 38, 55, 30, 0, Math.PI, Math.PI * 2);
   ctx.fill();
   if (avatarStyle === 'anime') {
-    // Spiky anime bangs
     ctx.beginPath();
-    ctx.moveTo(headX - 54, headY - 34);
-    ctx.lineTo(headX - 35, headY - 76);
-    ctx.lineTo(headX - 15, headY - 48);
-    ctx.lineTo(headX + 5, headY - 82);
-    ctx.lineTo(headX + 26, headY - 46);
-    ctx.lineTo(headX + 46, headY - 74);
-    ctx.lineTo(headX + 56, headY - 34);
+    ctx.moveTo(headX - 52, headY - 32);
+    ctx.lineTo(headX - 33, headY - 72);
+    ctx.lineTo(headX - 14, headY - 46);
+    ctx.lineTo(headX + 5, headY - 78);
+    ctx.lineTo(headX + 24, headY - 44);
+    ctx.lineTo(headX + 44, headY - 70);
+    ctx.lineTo(headX + 53, headY - 32);
     ctx.closePath();
     ctx.fill();
   } else {
     ctx.beginPath();
-    ctx.moveTo(headX - 56, headY - 22);
-    ctx.quadraticCurveTo(headX - 10, headY - 74, headX + 56, headY - 22);
-    ctx.quadraticCurveTo(headX, headY - 48, headX - 56, headY - 22);
+    ctx.moveTo(headX - 54, headY - 22);
+    ctx.quadraticCurveTo(headX - 8, headY - 70, headX + 54, headY - 22);
+    ctx.quadraticCurveTo(headX, headY - 46, headX - 54, headY - 22);
     ctx.fill();
   }
 
-  // Beard for baritone theme
   if (palette.beard) {
     ctx.fillStyle = palette.hair;
     ctx.beginPath();
-    ctx.ellipse(headX, headY + 34, 42, 32, 0, 0, Math.PI);
+    ctx.ellipse(headX, headY + 32, 40, 30, 0, 0, Math.PI);
     ctx.fill();
   }
 
   // 7. Eyes & Brows
-  const blink = tick % 170 > 164;
-  const browLift = emotion === 'shock' ? -7 : emotion === 'roast' ? 3 : 0;
+  const blink = tick % 180 > 174;
+  const browLift = emotion === 'shock' ? -6 : emotion === 'roast' ? 3 : 0;
 
-  ctx.strokeStyle = '#1b1520';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#191616';
+  ctx.lineWidth = 3.4;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(headX - 34, headY - 16 + browLift);
-  ctx.lineTo(headX - 12, headY - 19 + (emotion === 'roast' ? 4 : browLift));
-  ctx.moveTo(headX + 12, headY - 19 + (emotion === 'roast' ? 4 : browLift));
-  ctx.lineTo(headX + 34, headY - 16 + browLift);
+  ctx.moveTo(headX - 32, headY - 16 + browLift);
+  ctx.lineTo(headX - 11, headY - 18 + (emotion === 'roast' ? 4 : browLift));
+  ctx.moveTo(headX + 11, headY - 18 + (emotion === 'roast' ? 4 : browLift));
+  ctx.lineTo(headX + 32, headY - 16 + browLift);
   ctx.stroke();
 
   if (palette.shades) {
-    ctx.fillStyle = '#090d16';
+    ctx.fillStyle = '#090A0D';
     ctx.strokeStyle = palette.accent;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(headX - 42, headY - 12, 36, 20, 6);
-    ctx.roundRect(headX + 6, headY - 12, 36, 20, 6);
+    ctx.roundRect(headX - 40, headY - 11, 34, 18, 4);
+    ctx.roundRect(headX + 6, headY - 11, 34, 18, 4);
     ctx.fill();
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(headX - 6, headY - 4);
-    ctx.lineTo(headX + 6, headY - 4);
+    ctx.moveTo(headX - 6, headY - 3);
+    ctx.lineTo(headX + 6, headY - 3);
     ctx.stroke();
   } else {
-    ctx.fillStyle = '#14111c';
+    ctx.fillStyle = '#151417';
     if (blink || emotion === 'laugh') {
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.8;
       ctx.beginPath();
-      ctx.arc(headX - 22, headY - 2, 9, Math.PI, Math.PI * 2);
+      ctx.arc(headX - 21, headY - 2, 8.5, Math.PI, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(headX + 22, headY - 2, 9, Math.PI, Math.PI * 2);
+      ctx.arc(headX + 21, headY - 2, 8.5, Math.PI, Math.PI * 2);
       ctx.stroke();
     } else {
-      const eyeR = emotion === 'shock' ? 7 : 5.5;
+      const eyeR = emotion === 'shock' ? 6.2 : 5;
       ctx.beginPath();
-      ctx.arc(headX - 22, headY - 2, eyeR, 0, Math.PI * 2);
-      ctx.arc(headX + 22, headY - 2, eyeR, 0, Math.PI * 2);
+      ctx.arc(headX - 21, headY - 2, eyeR, 0, Math.PI * 2);
+      ctx.arc(headX + 21, headY - 2, eyeR, 0, Math.PI * 2);
       ctx.fill();
-      // Eye sparkle
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#F5F2EB';
       ctx.beginPath();
-      ctx.arc(headX - 20, headY - 4, 2, 0, Math.PI * 2);
-      ctx.arc(headX + 24, headY - 4, 2, 0, Math.PI * 2);
+      ctx.arc(headX - 19, headY - 3.8, 1.7, 0, Math.PI * 2);
+      ctx.arc(headX + 23, headY - 3.8, 1.7, 0, Math.PI * 2);
       ctx.fill();
     }
 
     if (palette.glasses) {
       ctx.strokeStyle = palette.accent;
-      ctx.lineWidth = 2.4;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(headX - 38, headY - 13, 31, 22, 6);
-      ctx.roundRect(headX + 7, headY - 13, 31, 22, 6);
+      ctx.roundRect(headX - 36, headY - 12, 29, 20, 4);
+      ctx.roundRect(headX + 7, headY - 12, 29, 20, 4);
       ctx.moveTo(headX - 7, headY - 2);
       ctx.lineTo(headX + 7, headY - 2);
       ctx.stroke();
     }
   }
 
-  // Headphones for Gamer host
   if (palette.headphones) {
     ctx.strokeStyle = palette.accent;
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(headX, headY - 4, 62, Math.PI, Math.PI * 2);
+    ctx.arc(headX, headY - 4, 59, Math.PI, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = '#111827';
+    ctx.fillStyle = '#141418';
     ctx.beginPath();
-    ctx.roundRect(headX - 70, headY - 14, 16, 36, 7);
-    ctx.roundRect(headX + 54, headY - 14, 16, 36, 7);
+    ctx.roundRect(headX - 66, headY - 13, 14, 34, 5);
+    ctx.roundRect(headX + 52, headY - 13, 14, 34, 5);
     ctx.fill();
   }
 
-  // 8. Mouth (real-time lip-sync)
-  const openHeight = 4 + mouthOpen * 22 + (emotion === 'laugh' ? 6 : 0);
-  const mouthW = emotion === 'shock' ? 12 : 20 + mouthOpen * 6;
-  ctx.fillStyle = '#3c1321';
+  // 8. Lip-synced Mouth
+  const openHeight = 3.5 + mouthOpen * 20 + (emotion === 'laugh' ? 5 : 0);
+  const mouthW = emotion === 'shock' ? 11 : 19 + mouthOpen * 5;
+  ctx.fillStyle = '#361A1D';
   ctx.beginPath();
-  ctx.ellipse(headX, headY + 32, mouthW, Math.max(3, openHeight * 0.55), 0, 0, Math.PI * 2);
+  ctx.ellipse(headX, headY + 30, mouthW, Math.max(2.6, openHeight * 0.52), 0, 0, Math.PI * 2);
   ctx.fill();
 
   if (openHeight > 9) {
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#F5F2EB';
     ctx.beginPath();
-    ctx.roundRect(headX - mouthW * 0.55, headY + 26, mouthW * 1.1, 4, 2);
+    ctx.roundRect(headX - mouthW * 0.52, headY + 25, mouthW * 1.04, 3.5, 1.5);
     ctx.fill();
   }
 
-  // 9. Props (Chai mug or Studio Mic)
-  if (palette.prop === 'chai') {
-    const mugX = cx + 98;
-    const mugY = height * 0.72 + bobY;
-    ctx.fillStyle = '#f8fafc';
-    ctx.beginPath();
-    ctx.roundRect(mugX, mugY, 34, 38, 7);
-    ctx.fill();
-    ctx.strokeStyle = '#f5b041';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(mugX + 35, mugY + 18, 9, -Math.PI / 2, Math.PI / 2);
-    ctx.stroke();
-    // Steam wisps
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.lineWidth = 2;
-    for (let s = 0; s < 2; s++) {
-      const drift = Math.sin(tick * 0.08 + s * 2) * 4;
-      ctx.beginPath();
-      ctx.moveTo(mugX + 10 + s * 14, mugY - 4);
-      ctx.quadraticCurveTo(mugX + 14 + s * 14 + drift, mugY - 18, mugX + 8 + s * 14, mugY - 28);
-      ctx.stroke();
-    }
-  } else if (palette.prop === 'mic') {
-    const micX = cx - 96;
-    const micY = height * 0.72;
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(micX - 24, height);
-    ctx.lineTo(micX, micY);
-    ctx.stroke();
-    ctx.fillStyle = palette.accent;
-    ctx.beginPath();
-    ctx.roundRect(micX - 10, micY - 22, 20, 28, 9);
-    ctx.fill();
-  }
-
-  // 10. Top-Right Emotion Reaction Pill
-  const badgeText = EMOTION_BADGES[emotion] || EMOTION_BADGES.neutral;
-  ctx.font = '700 13px Outfit, sans-serif';
-  const tw = ctx.measureText(badgeText).width;
-  ctx.fillStyle = 'rgba(10, 9, 18, 0.78)';
+  // 9. Broadcast Boom Mic Silhouette
+  const micX = cx - 96;
+  const micY = height * 0.72;
+  ctx.strokeStyle = '#3F3E45';
+  ctx.lineWidth = 3.5;
   ctx.beginPath();
-  ctx.roundRect(width - tw - 36, 14, tw + 22, 28, 14);
-  ctx.fill();
-  ctx.strokeStyle = `${palette.accent}88`;
-  ctx.lineWidth = 1.5;
+  ctx.moveTo(micX - 24, height);
+  ctx.lineTo(micX, micY);
   ctx.stroke();
-  // Top-right emotion badge sits cleanly opposite the DOM ON-AIR pill (no top-left overlap)
-  ctx.fillStyle = '#fff';
-  ctx.fillText(badgeText, width - tw - 25, 32);
+  ctx.fillStyle = '#25252C';
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.roundRect(micX - 9, micY - 22, 18, 28, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  // 10. Top-Right Editorial State Indicator (No Emojis)
+  const labelText = EMOTION_LABELS[emotion] || EMOTION_LABELS.neutral;
+  ctx.font = '600 11px Inter, sans-serif';
+  const tw = ctx.measureText(labelText).width;
+  ctx.fillStyle = 'rgba(7, 7, 9, 0.8)';
+  ctx.beginPath();
+  ctx.roundRect(width - tw - 32, 12, tw + 20, 24, 4);
+  ctx.fill();
+  ctx.strokeStyle = `${palette.accent}66`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#F5F2EB';
+  ctx.fillText(labelText, width - tw - 22, 28);
 }

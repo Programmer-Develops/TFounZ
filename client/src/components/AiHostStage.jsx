@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Radio } from 'lucide-react';
 import { drawStudioAvatar } from '../utils/canvasAvatarDrawer';
 
 export default function AiHostStage({
@@ -32,9 +33,12 @@ export default function AiHostStage({
           let sum = 0;
           for (let i = 0; i < 24; i++) sum += freqData[i];
           const avg = sum / 24;
-          mouthOpen = avg > 6 ? Math.min(1, Math.max(0.1, (avg - 8) / 90)) : 0.25 + Math.abs(Math.sin(tick * 0.27)) * 0.45;
+          mouthOpen =
+            avg > 6
+              ? Math.min(1, Math.max(0.1, (avg - 8) / 90))
+              : 0.25 + Math.abs(Math.sin(tick * 0.27)) * 0.45;
         } else if (isSpeaking) {
-          mouthOpen = 0.28 + Math.abs(Math.sin(tick * 0.27)) * 0.58;
+          mouthOpen = 0.28 + Math.abs(Math.sin(tick * 0.27)) * 0.56;
         } else {
           mouthOpen = 0.03;
         }
@@ -62,29 +66,20 @@ export default function AiHostStage({
     aiRole === 'guest' ? 'AI GUEST' : aiRole === 'co-host' ? 'AI CO-HOST' : 'AI HOST';
 
   return (
-    <div className="stage-frame">
+    <div className={`stage-tile ${isSpeaking ? 'speaking' : ''}`}>
       <canvas ref={canvasRef} width={640} height={400} />
 
-      <div className="stage-overlay-top">
+      <div className="stage-tile-top">
         <span className="badge badge-live">
-          <span className="pulse-dot" /> ON AIR • {roleBadge}
+          <Radio size={11} /> ON AIR · {roleBadge}
         </span>
       </div>
 
-      <div className="stage-chyron">
-        <div
-          style={{
-            fontSize: '0.72rem',
-            fontWeight: 800,
-            color: 'var(--accent-gold)',
-            letterSpacing: '0.06em',
-          }}
-        >
-          {hostName} • {tagline}
+      <div className="stage-chyron" title={`${hostName} — ${lowerThirdText}`}>
+        <div className="stage-chyron-meta">
+          {hostName} · {tagline}
         </div>
-        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff', marginTop: 2 }}>
-          {lowerThirdText}
-        </div>
+        <div className="stage-chyron-title">{lowerThirdText}</div>
       </div>
     </div>
   );

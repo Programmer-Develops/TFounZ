@@ -71,12 +71,12 @@ function playNoiseBurst(graph, startTime, duration, filterFreq = 1200, gainVal =
 }
 
 export const SFX_OPTIONS = [
-  { id: 'applause', label: 'Applause', emoji: '👏' },
-  { id: 'laugh', label: 'Studio Laugh', emoji: '😂' },
-  { id: 'drumroll', label: 'Drumroll', emoji: '🥁' },
-  { id: 'rimshot', label: 'Ba-Dum-Tss', emoji: '💥' },
-  { id: 'sip_tea', label: 'Sip Chai', emoji: '☕' },
-  { id: 'buzzer', label: 'Rapid-Fire Buzzer', emoji: '🚨' },
+  { id: 'applause', label: 'Applause' },
+  { id: 'laugh', label: 'Studio Laugh' },
+  { id: 'drumroll', label: 'Drumroll' },
+  { id: 'rimshot', label: 'Rimshot' },
+  { id: 'sip_tea', label: 'Chai Sip' },
+  { id: 'buzzer', label: 'Buzzer' },
 ];
 
 export function playStudioSfx(sfx) {

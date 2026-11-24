@@ -6,6 +6,8 @@ import {
   MicOff,
   Video,
   VideoOff,
+  Monitor,
+  MonitorOff,
   Hand,
   Sparkles,
   Send,
@@ -23,9 +25,22 @@ import {
   AudioLines,
   X,
   Trophy,
+  ArrowLeft,
+  MessageSquare,
+  Users,
+  Sliders,
+  PanelRightClose,
+  PanelRightOpen,
+  Music2,
+  Wifi,
+  WifiOff,
+  Radio,
+  Disc,
+  User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useStudio } from '../context/StudioContext';
+import { useToast } from '../context/ToastContext';
 import { apiFetch, apiFetchBlobUrl, ensureFreshAccessToken } from '../utils/api';
 import {
   playStudioSfx,
@@ -35,11 +50,21 @@ import {
   getAiAnalyserNode,
 } from '../utils/soundboard';
 import { setPendingClip } from '../utils/clipStore';
+import { getStudioPrefs, saveStudioPrefs } from '../utils/studioPrefs';
 import AiHostStage from '../components/AiHostStage';
 import BroadcastRecorder from '../components/BroadcastRecorder';
 import LiveVoiceDubPanel from '../components/LiveVoiceDubPanel';
+import PersonaPortrait from '../components/ui/PersonaPortrait';
+import { ErrorBanner, LoadingState } from '../components/ui/Primitives';
 
 const SOCKET_URL = (import.meta.env.VITE_SOCKET_URL || '').replace(/\/+$/, '');
+
+function formatElapsed(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+  const s = String(totalSeconds % 60).padStart(2, '0');
+  return h > 0 ? `${String(h).padStart(2, '0')}:${m}:${s}` : `${m}:${s}`;
+}
 
 function RemoteVideoTile({ peer, registerVideoEl }) {
   const ref = useRef(null);
@@ -55,29 +80,39 @@ function RemoteVideoTile({ peer, registerVideoEl }) {
   }, [peer.socketId, peer.stream, registerVideoEl]);
 
   return (
-    <div className="stage-frame">
+    <div className="stage-tile">
       <video ref={ref} autoPlay playsInline />
-      <div className="stage-overlay-top">
-        <span className="badge badge-cyan">{peer.name || 'Live Guest'} • WEBRTC</span>
+      <div className="stage-tile-top">
+        <span className="stage-nameplate">
+          <User size={11} color="var(--status-positive)" />
+          {peer.name || 'Live Guest'}
+        </span>
       </div>
     </div>
   );
 }
 
-async function requestMediaWithFallback() {
+async function requestMediaWithFallback(prefs = {}) {
   if (!navigator.mediaDevices?.getUserMedia) {
     return {
       stream: null,
       hasVideo: false,
       hasAudio: false,
-      warning: 'Camera/mic API unavailable in this browser context (use localhost or HTTPS).',
+      warning: 'Camera and microphone require localhost or HTTPS.',
     };
   }
 
+  const videoConstraint = prefs.videoDeviceId
+    ? { deviceId: { exact: prefs.videoDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    : { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' };
+  const audioConstraint = prefs.audioDeviceId
+    ? { deviceId: { exact: prefs.audioDeviceId } }
+    : true;
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-      audio: true,
+      video: videoConstraint,
+      audio: audioConstraint,
     });
     return {
       stream,
@@ -86,31 +121,29 @@ async function requestMediaWithFallback() {
       warning: '',
     };
   } catch (bothErr) {
-    // Fallback 1: video only (e.g., webcam present without microphone)
     try {
       const videoOnly = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       return {
         stream: videoOnly,
         hasVideo: true,
         hasAudio: false,
-        warning: 'Camera active (microphone unavailable or denied).',
+        warning: 'Camera active. Microphone unavailable or denied.',
       };
     } catch {
-      // Fallback 2: audio only (e.g., mic present without webcam)
       try {
         const audioOnly = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
         return {
           stream: audioOnly,
           hasVideo: false,
           hasAudio: true,
-          warning: 'Microphone active (camera unavailable or blocked by another app).',
+          warning: 'Microphone active. Camera unavailable or in use by another app.',
         };
       } catch {
         const reason =
           bothErr?.name === 'NotAllowedError'
-            ? 'Camera & microphone permission denied. Allow access in your browser address bar, then click Enable Camera.'
+            ? 'Camera & microphone permission denied. Allow access in your browser bar, then retry.'
             : bothErr?.name === 'NotReadableError'
-              ? 'Camera is in use by another app. Close the other app and click Enable Camera.'
+              ? 'Camera is in use by another application.'
               : `Camera/mic unavailable (${bothErr?.name || 'device error'}).`;
         return { stream: null, hasVideo: false, hasAudio: false, warning: reason };
       }
@@ -123,6 +156,9 @@ export default function ShowRoomPage() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
   const { presets, guestPresets } = useStudio();
+  const { toast } = useToast();
+
+  const initialPrefs = getStudioPrefs();
 
   const [meeting, setMeeting] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -131,11 +167,19 @@ export default function ShowRoomPage() {
   const [loading, setLoading] = useState(true);
   const [roomError, setRoomError] = useState('');
   const [mediaWarning, setMediaWarning] = useState('');
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [recState, setRecState] = useState({ recording: false, seconds: 0 });
 
-  // Media state (storing localStream in state ensures <video> attaches right after loading finishes!)
+  // Media & Screen Share state
   const [localStream, setLocalStream] = useState(null);
+  const [screenStream, setScreenStream] = useState(null);
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [mirrorCamera, setMirrorCamera] = useState(initialPrefs.mirrorCamera);
+  const [devices, setDevices] = useState({ video: [], audio: [] });
+  const [selectedVideoId, setSelectedVideoId] = useState(initialPrefs.videoDeviceId);
+  const [selectedAudioId, setSelectedAudioId] = useState(initialPrefs.audioDeviceId);
 
   // AI Talk Show state
   const [promptText, setPromptText] = useState('');
@@ -144,33 +188,37 @@ export default function ShowRoomPage() {
   const [askingAi, setAskingAi] = useState(false);
   const [aiSpeaking, setAiSpeaking] = useState(false);
   const [aiVoiceEnabled, setAiVoiceEnabled] = useState(true);
-  const [voiceEngine, setVoiceEngine] = useState('browser'); // 'browser' | 'sounz'
+  const [voiceEngine, setVoiceEngine] = useState(initialPrefs.defaultVoiceEngine || 'browser');
   const [sounzSynthesizing, setSounzSynthesizing] = useState(false);
   const [emotion, setEmotion] = useState('neutral');
-  const [lowerThird, setLowerThird] = useState('WELCOME TO TFOUNZ STUDIO');
+  const [lowerThird, setLowerThird] = useState('LIVE BROADCAST');
   const [listeningMic, setListeningMic] = useState(false);
   const [analyserNode, setAnalyserNode] = useState(null);
 
-  // AI Show Notes / Summary state
+  // AI Show Notes
   const [summaryData, setSummaryData] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
 
-  // Rapid-Fire 60s Round state
+  // Rapid-Fire 60s Round
   const [rapidFireActive, setRapidFireActive] = useState(false);
   const [rapidFireQuestions, setRapidFireQuestions] = useState([]);
   const [rapidFireIdx, setRapidFireIdx] = useState(0);
   const [rapidFireTimer, setRapidFireTimer] = useState(60);
   const [rapidFireScore, setRapidFireScore] = useState(0);
 
-  // UI state
-  const [activeTab, setActiveTab] = useState('chat');
+  // Studio Dock & Panel UI
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'audience' | 'audio' | 'notes'
+  const [sfxOpen, setSfxOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
 
   // Stable refs
   const socketRef = useRef(null);
   const localVideoRef = useRef(null);
+  const screenVideoRef = useRef(null);
   const localStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const peersRef = useRef(new Map());
   const remoteVideoMapRef = useRef(new Map());
   const aiCanvasRef = useRef(null);
@@ -179,19 +227,54 @@ export default function ShowRoomPage() {
   const aiVoiceEnabledRef = useRef(aiVoiceEnabled);
   const voiceEngineRef = useRef(voiceEngine);
 
-  // Attach localStream to <video> whenever loading transitions to false or localStream updates
+  // Elapsed studio timer
+  useEffect(() => {
+    if (!meeting || meeting.status === 'ended') return;
+    const id = setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [meeting]);
+
+  // Attach localStream to <video> whenever mounted or updated
   useEffect(() => {
     const videoEl = localVideoRef.current;
     if (!videoEl) return;
     if (localStream) {
-      if (videoEl.srcObject !== localStream) {
-        videoEl.srcObject = localStream;
-      }
+      if (videoEl.srcObject !== localStream) videoEl.srcObject = localStream;
       videoEl.play().catch(() => {});
     } else {
       videoEl.srcObject = null;
     }
   }, [localStream, loading, camOn]);
+
+  // Attach screenStream to <video>
+  useEffect(() => {
+    const el = screenVideoRef.current;
+    if (!el) return;
+    if (screenStream) {
+      el.srcObject = screenStream;
+      el.play().catch(() => {});
+    } else {
+      el.srcObject = null;
+    }
+  }, [screenStream]);
+
+  // Enumerate media devices once stream is active
+  const refreshDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      setDevices({
+        video: list.filter((d) => d.kind === 'videoinput'),
+        audio: list.filter((d) => d.kind === 'audioinput'),
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (localStream) refreshDevices();
+  }, [localStream, refreshDevices]);
 
   useEffect(() => {
     aiVoiceEnabledRef.current = aiVoiceEnabled;
@@ -227,7 +310,12 @@ export default function ShowRoomPage() {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+    }
     setLocalStream(null);
+    setScreenStream(null);
     setCamOn(false);
     setMicOn(false);
   }, []);
@@ -241,8 +329,7 @@ export default function ShowRoomPage() {
     try {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = 1.04;
-      utter.pitch = 1.0;
+      utter.rate = 1.03;
       utter.onstart = () => setAiSpeaking(true);
       utter.onend = () => setAiSpeaking(false);
       utter.onerror = () => setAiSpeaking(false);
@@ -291,7 +378,7 @@ export default function ShowRoomPage() {
     [speakBrowserFallback]
   );
 
-  // Rapid-fire countdown
+  // Rapid-fire timer
   useEffect(() => {
     if (!rapidFireActive) return;
     if (rapidFireTimer <= 0) {
@@ -303,12 +390,12 @@ export default function ShowRoomPage() {
     return () => clearInterval(id);
   }, [rapidFireActive, rapidFireTimer]);
 
-  // Auto scroll chat
+  // Auto-scroll transcript
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
-  // Boot room ONCE per [code, user._id]
+  // Boot studio ONCE per [code, user._id]
   useEffect(() => {
     let active = true;
 
@@ -370,7 +457,7 @@ export default function ShowRoomPage() {
         setMeeting(loadedMeeting);
         setMessages(res.data.messages || []);
         setLowerThird(
-          `${loadedMeeting.aiPersona?.name || 'AI'} • ${loadedMeeting.title}`.toUpperCase()
+          `${loadedMeeting.aiPersona?.name || 'AI'} · ${loadedMeeting.title}`.toUpperCase()
         );
 
         if (loadedMeeting.status === 'ended') {
@@ -379,8 +466,7 @@ export default function ShowRoomPage() {
           return;
         }
 
-        // Request Camera & Mic with graceful fallback
-        const media = await requestMediaWithFallback();
+        const media = await requestMediaWithFallback(getStudioPrefs());
         if (!active) {
           media.stream?.getTracks().forEach((t) => t.stop());
           return;
@@ -398,7 +484,12 @@ export default function ShowRoomPage() {
         socketRef.current = socket;
 
         socket.on('connect', () => {
+          setSocketConnected(true);
           socket.emit('room:join', { code: loadedMeeting.code });
+        });
+
+        socket.on('disconnect', () => {
+          setSocketConnected(false);
         });
 
         socket.on('room:joined', ({ participants: roster }) => {
@@ -455,9 +546,7 @@ export default function ShowRoomPage() {
 
         socket.on('room:ended', () => {
           setMeeting((prev) => (prev ? { ...prev, status: 'ended' } : prev));
-          setRoomError(
-            'The host has ended this show. Open the Attendance Report or Post-Production Studio!'
-          );
+          setRoomError('The host has ended this show. View the Attendance Report or Post-Production.');
           teardownMediaAndPeers();
         });
 
@@ -478,7 +567,7 @@ export default function ShowRoomPage() {
               sdp: offer,
             });
           } catch {
-            // ignore negotiation race
+            // ignore race
           }
         });
 
@@ -495,7 +584,7 @@ export default function ShowRoomPage() {
               sdp: answer,
             });
           } catch {
-            // ignore negotiation race
+            // ignore race
           }
         });
 
@@ -551,24 +640,26 @@ export default function ShowRoomPage() {
   const activePreset = [...presets, ...guestPresets].find((p) => p.id === meeting?.showFormat);
   const starterPrompts = activePreset?.starterPrompts || [];
 
-  const retryEnableMedia = async () => {
+  const switchMediaDevices = async (nextVideoId, nextAudioId) => {
     setMediaWarning('');
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
     }
-    const media = await requestMediaWithFallback();
+    const prefs = saveStudioPrefs({ videoDeviceId: nextVideoId, audioDeviceId: nextAudioId });
+    const media = await requestMediaWithFallback(prefs);
     localStreamRef.current = media.stream;
     setLocalStream(media.stream);
     setCamOn(media.hasVideo);
     setMicOn(media.hasAudio);
     setMediaWarning(media.warning);
 
-    // Notify connected WebRTC peers if new tracks were acquired
     if (media.stream && socketRef.current && meeting?.code) {
       for (const pc of peersRef.current.values()) {
+        const senders = pc.getSenders();
         media.stream.getTracks().forEach((track) => {
-          const alreadySending = pc.getSenders().some((s) => s.track?.kind === track.kind);
-          if (!alreadySending) pc.addTrack(track, media.stream);
+          const match = senders.find((s) => s.track?.kind === track.kind);
+          if (match) match.replaceTrack(track).catch(() => {});
+          else pc.addTrack(track, media.stream);
         });
       }
       socketRef.current.emit('webrtc:ready', { code: meeting.code });
@@ -581,7 +672,7 @@ export default function ShowRoomPage() {
       track.enabled = !track.enabled;
       setMicOn(track.enabled);
     } else {
-      await retryEnableMedia();
+      await switchMediaDevices(selectedVideoId, selectedAudioId);
     }
   };
 
@@ -591,7 +682,36 @@ export default function ShowRoomPage() {
       track.enabled = !track.enabled;
       setCamOn(track.enabled);
     } else {
-      await retryEnableMedia();
+      await switchMediaDevices(selectedVideoId, selectedAudioId);
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setScreenStream(null);
+      toast('Screen sharing stopped', 'info');
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      toast('Screen sharing is not supported in this browser.', 'error');
+      return;
+    }
+
+    try {
+      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const [screenTrack] = display.getVideoTracks();
+      screenTrack.onended = () => {
+        screenStreamRef.current = null;
+        setScreenStream(null);
+      };
+      screenStreamRef.current = display;
+      setScreenStream(display);
+      toast('Screen share live on broadcast stage', 'success');
+    } catch {
+      // user cancelled picker
     }
   };
 
@@ -629,7 +749,7 @@ export default function ShowRoomPage() {
   const handleDictatePrompt = () => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
-      setRoomError('Browser speech recognition is unavailable; type your line below.');
+      toast('Speech recognition unavailable in this browser; type your line below.', 'error');
       return;
     }
     const rec = new SpeechRec();
@@ -652,6 +772,7 @@ export default function ShowRoomPage() {
         method: 'POST',
         body: JSON.stringify({ topic: meeting.title }),
       });
+      toast('60-second Rapid-Fire round started', 'info');
     } catch (err) {
       setRoomError(err.message);
     }
@@ -665,6 +786,7 @@ export default function ShowRoomPage() {
         method: 'POST',
       });
       setSummaryData(res.data);
+      toast('AI episode highlights generated', 'success');
     } catch (err) {
       setRoomError(err.message);
     } finally {
@@ -700,6 +822,7 @@ export default function ShowRoomPage() {
       code: meeting.code,
       targetUserId,
     });
+    toast('Participant removed from stage', 'info');
   };
 
   const handleEndShow = async () => {
@@ -720,7 +843,17 @@ export default function ShowRoomPage() {
     if (!meeting?.code) return;
     navigator.clipboard?.writeText(meeting.code);
     setCopiedCode(true);
+    toast(`Show code ${meeting.code} copied`, 'success');
     setTimeout(() => setCopiedCode(false), 1800);
+  };
+
+  const openPanelTab = (tab) => {
+    if (panelOpen && activeTab === tab) {
+      setPanelOpen(false);
+    } else {
+      setActiveTab(tab);
+      setPanelOpen(true);
+    }
   };
 
   const openFilmyWithSuggestedPrompt = () => {
@@ -736,175 +869,158 @@ export default function ShowRoomPage() {
 
   if (loading) {
     return (
-      <div className="container page-shell">
-        <p style={{ color: 'var(--text-secondary)' }}>Entering studio stage...</p>
+      <div className="studio-viewport" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <LoadingState label="Initializing broadcast studio..." />
       </div>
     );
   }
 
   if (!meeting) {
     return (
-      <div className="container page-shell">
-        <div className="alert-error">{roomError || 'Show not found'}</div>
-        <Link to="/dashboard" className="btn btn-ghost btn-sm" style={{ marginTop: 14 }}>
-          Back to Control Room
+      <div style={{ maxWidth: 520, margin: '80px auto', padding: 24 }} className="surface">
+        <ErrorBanner message={roomError || 'Show not found'} />
+        <Link to="/dashboard" className="btn btn-secondary btn-sm" style={{ marginTop: 14 }}>
+          <ArrowLeft size={14} /> Return to Overview
         </Link>
       </div>
     );
   }
 
   const aiLabel = aiRole === 'guest' ? 'AI Guest' : aiRole === 'co-host' ? 'AI Co-Host' : 'AI Host';
+  const totalStageTiles = 2 + (screenStream ? 1 : 0) + remotePeers.length;
+  const gridColsClass = totalStageTiles >= 3 ? 'cols-3' : 'cols-2';
 
   return (
-    <div className="container page-shell" style={{ paddingTop: 18 }}>
+    <div className="studio-viewport">
       {/* Top Broadcast Header */}
-      <div
-        className="card card-compact"
-        style={{
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span className={`badge ${meeting.status === 'live' ? 'badge-live' : 'badge-gold'}`}>
-            <span className="pulse-dot" /> {meeting.status}
+      <header className="studio-topbar">
+        <div className="studio-topbar-left">
+          <Link to="/dashboard" className="btn btn-ghost btn-icon btn-sm" title="Back to Studio Overview">
+            <ArrowLeft size={16} />
+          </Link>
+
+          <span className={`badge ${meeting.status === 'live' ? 'badge-live' : 'badge-accent'}`}>
+            <Radio size={11} /> {meeting.status}
           </span>
-          <div>
-            <h1 style={{ fontSize: '1.2rem' }}>{meeting.title}</h1>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              {aiRole === 'guest' ? 'You are the Show Host interviewing' : 'Hosted by'}{' '}
-              <strong>{meeting.aiPersona?.name}</strong> ({aiLabel}) ·{' '}
-              {(camOn ? 1 : 0) + remotePeers.length} live camera
-              {(camOn ? 1 : 0) + remotePeers.length === 1 ? '' : 's'}
+
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={meeting.title}
+            >
+              {meeting.title}
+            </div>
+            <div
+              className="studio-topbar-sub"
+              style={{
+                fontSize: '0.72rem',
+                color: 'var(--text-muted)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {aiRole === 'guest' ? 'Interviewing' : 'Hosted by'} {meeting.aiPersona?.name} ·{' '}
+              <span className="mono">{formatElapsed(elapsedSec)}</span>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-ghost btn-sm mono" onClick={copyShowCode}>
-            {copiedCode ? <Check size={14} color="var(--accent-emerald)" /> : <Copy size={14} />}
+        <div className="studio-topbar-right">
+          {recState.recording && (
+            <span className="badge badge-live mono">
+              <Disc size={11} /> REC {formatElapsed(recState.seconds)}
+            </span>
+          )}
+
+          <span
+            className={`badge ${socketConnected ? 'badge-positive' : 'badge-warn'}`}
+            title="Real-time Studio Connection"
+          >
+            {socketConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
+            {socketConnected ? 'Connected' : 'Reconnecting'}
+          </span>
+
+          <button type="button" className="btn btn-secondary btn-sm mono" onClick={copyShowCode}>
+            {copiedCode ? <Check size={13} color="var(--status-positive)" /> : <Copy size={13} />}
             {meeting.code}
           </button>
 
-          <button
-            type="button"
-            className={`btn btn-sm ${voiceEngine === 'sounz' ? 'btn-emerald' : 'btn-ghost'}`}
-            onClick={() => setVoiceEngine((v) => (v === 'sounz' ? 'browser' : 'sounz'))}
-            title="Switch between Instant Browser Voice and SounZ AI Studio Voice"
-          >
-            <AudioLines size={14} />
-            {voiceEngine === 'sounz'
-              ? sounzSynthesizing
-                ? 'SounZ AI...'
-                : 'SounZ AI Voice'
-              : 'Browser Voice'}
-          </button>
-
-          <button
-            type="button"
-            className={`btn btn-sm ${micOn ? 'btn-ghost' : 'btn-crimson'}`}
-            onClick={toggleMic}
-            title={micOn ? 'Mute Mic' : 'Enable Mic'}
-          >
-            {micOn ? <Mic size={14} /> : <MicOff size={14} />}
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${camOn ? 'btn-ghost' : 'btn-crimson'}`}
-            onClick={toggleCam}
-            title={camOn ? 'Turn Off Camera' : 'Enable Camera'}
-          >
-            {camOn ? <Video size={14} /> : <VideoOff size={14} />}
-          </button>
-          <button type="button" className={`btn btn-sm ${handRaised ? 'btn-primary' : 'btn-ghost'}`} onClick={toggleHand}>
-            <Hand size={14} /> {handRaised ? 'Hand Raised' : 'Raise Hand'}
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${aiVoiceEnabled ? 'btn-ghost' : 'btn-crimson'}`}
-            onClick={() => setAiVoiceEnabled((v) => !v)}
-            title={aiVoiceEnabled ? 'Mute AI Speech' : 'Unmute AI Speech'}
-          >
-            {aiVoiceEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-          </button>
-
           {isHost && meeting.status !== 'ended' && (
-            <button type="button" className="btn btn-crimson btn-sm" onClick={handleEndShow}>
-              <PhoneOff size={14} /> End Show
+            <button type="button" className="btn btn-danger btn-sm" onClick={handleEndShow}>
+              <PhoneOff size={13} /> End Show
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {roomError && (
-        <div className="alert-error" style={{ marginBottom: 14 }}>
-          {roomError}
-        </div>
-      )}
+      {/* Main Workspace: Stage + Collapsible Side Panel */}
+      <div className="studio-body">
+        <div className="studio-stage-area">
+          {roomError && <ErrorBanner message={roomError} onDismiss={() => setRoomError('')} />}
 
-      {/* Main Studio Grid */}
-      <div className="show-layout">
-        {/* Left Stage Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Rapid-Fire Banner */}
+          {/* Rapid-Fire Broadcast Ticker */}
           {rapidFireActive && (
             <div
-              className="card card-compact"
               style={{
-                borderColor: 'rgba(255, 77, 109, 0.5)',
-                background:
-                  'linear-gradient(90deg, rgba(255, 77, 109, 0.16), rgba(245, 176, 65, 0.12))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 14,
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--accent-border)',
+                flexWrap: 'wrap',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span className="badge badge-live">
-                      <Zap size={12} /> 60s RAPID-FIRE ROUND
-                    </span>
-                    <span className="badge badge-gold">
-                      <Trophy size={12} /> {rapidFireScore} pts
-                    </span>
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: '1.02rem' }}>
-                    Q{rapidFireIdx + 1}: {rapidFireQuestions[rapidFireIdx] || 'Answer fast!'}
-                  </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span className="badge badge-live">
+                    <Zap size={11} /> Rapid-Fire Round
+                  </span>
+                  <span className="badge badge-accent mono">
+                    <Trophy size={11} /> {rapidFireScore} pts
+                  </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {aiRole === 'guest' && rapidFireQuestions[rapidFireIdx] && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      disabled={askingAi}
-                      onClick={() => handleAskAi(null, rapidFireQuestions[rapidFireIdx])}
-                    >
-                      Fire at AI Guest
-                    </button>
-                  )}
-                  <div
-                    className="mono"
-                    style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--accent-gold)' }}
+                <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>
+                  Q{rapidFireIdx + 1}: {rapidFireQuestions[rapidFireIdx] || 'Answer quickly'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {aiRole === 'guest' && rapidFireQuestions[rapidFireIdx] && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={askingAi}
+                    onClick={() => handleAskAi(null, rapidFireQuestions[rapidFireIdx])}
                   >
-                    {rapidFireTimer}s
-                  </div>
+                    Ask AI Guest
+                  </button>
+                )}
+                <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--accent)' }}>
+                  00:{String(rapidFireTimer).padStart(2, '0')}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Split-Screen TV Couch */}
-          <div className="stage-grid">
-            <div className="stage-frame">
+          {/* Primary Central Video Stage */}
+          <div className={`studio-video-grid ${gridColsClass}`}>
+            {/* Human Host / Guest Camera Tile */}
+            <div className="stage-tile">
               <video
                 ref={localVideoRef}
                 autoPlay
                 playsInline
                 muted
-                style={{ transform: 'scaleX(-1)' }}
+                style={{ transform: mirrorCamera ? 'scaleX(-1)' : 'none' }}
               />
               {!camOn && (
                 <div
@@ -918,31 +1034,41 @@ export default function ShowRoomPage() {
                     gap: 10,
                     padding: 20,
                     textAlign: 'center',
-                    background: '#13101e',
-                    color: 'var(--text-secondary)',
+                    background: '#0F0F13',
                   }}
                 >
-                  <VideoOff size={28} color="var(--text-muted)" />
-                  <div style={{ fontWeight: 700 }}>Camera Off ({user?.name})</div>
+                  <VideoOff size={24} color="var(--text-muted)" />
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Camera Off</div>
                   {mediaWarning && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', maxWidth: 280 }}>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--status-warn)', maxWidth: 280 }}>
                       {mediaWarning}
                     </div>
                   )}
                   {meeting.status !== 'ended' && (
                     <button type="button" className="btn btn-primary btn-sm" onClick={toggleCam}>
-                      <Video size={14} /> Enable Camera
+                      <Video size={13} /> Enable Camera
                     </button>
                   )}
                 </div>
               )}
-              <div className="stage-overlay-top">
-                <span className="badge">
-                  {user?.name} ({aiRole === 'guest' ? 'Show Host' : 'You'})
+              <div className="stage-tile-top">
+                <span className="stage-nameplate">
+                  {micOn ? (
+                    <Mic size={12} color="var(--status-positive)" />
+                  ) : (
+                    <MicOff size={12} color="var(--status-live)" />
+                  )}
+                  {user?.name} ({aiRole === 'guest' ? 'Host' : 'You'})
                 </span>
+                {handRaised && (
+                  <span className="badge badge-accent">
+                    <Hand size={11} /> Raised
+                  </span>
+                )}
               </div>
             </div>
 
+            {/* AI Host / AI Guest Stage */}
             <AiHostStage
               avatarStyle={meeting.aiPersona?.avatarStyle}
               hostName={meeting.aiPersona?.name}
@@ -954,58 +1080,56 @@ export default function ShowRoomPage() {
               analyserNode={analyserNode}
               externalCanvasRef={aiCanvasRef}
             />
+
+            {/* Screen Share Feed Tile */}
+            {screenStream && (
+              <div className="stage-tile">
+                <video ref={screenVideoRef} autoPlay playsInline muted />
+                <div className="stage-tile-top">
+                  <span className="stage-nameplate">
+                    <Monitor size={12} color="var(--accent)" /> Shared Screen
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    style={{ pointerEvents: 'auto', height: 24, padding: '0 8px' }}
+                    onClick={toggleScreenShare}
+                  >
+                    Stop
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Multi-Participant WebRTC Remote Video Tiles */}
+            {remotePeers.map((peer) => (
+              <RemoteVideoTile
+                key={peer.socketId}
+                peer={peer}
+                registerVideoEl={registerRemoteVideoEl}
+              />
+            ))}
           </div>
 
-          {/* Multi-Participant WebRTC Remote Video Grid */}
-          {(remotePeers.length > 0 || meeting.mode === 'live-studio') && (
-            <div className="stage-grid">
-              {remotePeers.map((peer) => (
-                <RemoteVideoTile
-                  key={peer.socketId}
-                  peer={peer}
-                  registerVideoEl={registerRemoteVideoEl}
-                />
-              ))}
-              {remotePeers.length === 0 && meeting.mode === 'live-studio' && (
-                <div
-                  className="glass-panel"
-                  style={{
-                    gridColumn: '1 / -1',
-                    padding: '14px 16px',
-                    textAlign: 'center',
-                    color: 'var(--text-muted)',
-                    fontSize: '0.88rem',
-                  }}
-                >
-                  Invite co-hosts or guests using show code{' '}
-                  <strong className="mono" style={{ color: 'var(--accent-gold)' }}>
-                    {meeting.code}
-                  </strong>{' '}
-                  — live WebRTC video tiles appear automatically when they join!
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Talk to AI Host / Guest Controls */}
-          <div className="card card-compact">
-            <form onSubmit={handleAskAi} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Conversation Command Bar */}
+          <div className="studio-command-bar">
+            <form onSubmit={handleAskAi} className="studio-command-form">
               <button
                 type="button"
-                className={`btn btn-sm ${listeningMic ? 'btn-crimson' : 'btn-ghost'}`}
+                className={`btn btn-sm ${listeningMic ? 'btn-danger' : 'btn-secondary'}`}
                 onClick={handleDictatePrompt}
-                title="Speak via Web Speech API"
+                title="Voice-to-text dictation"
               >
-                <Mic size={15} /> {listeningMic ? 'Listening...' : 'Speak'}
+                <Mic size={13} /> {listeningMic ? 'Listening' : 'Dictate'}
               </button>
 
               <input
                 className="input"
-                style={{ flex: 1, minWidth: 200 }}
+                style={{ flex: 1, minWidth: 110, height: 32, fontSize: '0.82rem' }}
                 placeholder={
                   aiRole === 'guest'
-                    ? `Interview ${meeting.aiPersona?.name} on air...`
-                    : `Say something on air to ${meeting.aiPersona?.name}...`
+                    ? `Ask ${meeting.aiPersona?.name} a question...`
+                    : `Speak or type to ${meeting.aiPersona?.name}...`
                 }
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
@@ -1017,62 +1141,446 @@ export default function ShowRoomPage() {
                 className="btn btn-primary btn-sm"
                 disabled={askingAi || !promptText.trim() || meeting.status === 'ended'}
               >
-                <Sparkles size={15} /> {askingAi ? 'Thinking...' : `Talk to ${aiLabel}`}
+                <Sparkles size={13} /> {askingAi ? 'Responding...' : `Ask ${aiLabel}`}
               </button>
 
               <button
                 type="button"
-                className="btn btn-crimson btn-sm"
+                className="btn btn-secondary btn-sm"
                 onClick={handleStartRapidFire}
                 disabled={meeting.status === 'ended'}
               >
-                <Zap size={15} /> Rapid-Fire
+                <Zap size={13} color="var(--accent)" /> Rapid-Fire
               </button>
             </form>
 
-            {/* 1-Click Conversation Starters */}
             {starterPrompts.length > 0 && meeting.status !== 'ended' && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+              <div className="studio-prompt-row">
                 {starterPrompts.map((starter) => (
                   <button
                     key={starter}
                     type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: '0.75rem', padding: '5px 10px' }}
+                    className="btn btn-ghost btn-sm studio-prompt-chip"
                     disabled={askingAi}
                     onClick={() => handleAskAi(null, starter)}
                   >
-                    💬 {starter}
+                    {starter}
                   </button>
                 ))}
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Studio Soundboard */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-              {SFX_OPTIONS.map((item) => (
+        {/* Collapsible Right Studio Panel */}
+        {panelOpen && (
+          <aside className="studio-sidepanel">
+            <div className="studio-sidepanel-tabs">
+              {[
+                { id: 'chat', label: 'Chat', icon: MessageSquare },
+                { id: 'audience', label: `Stage (${participants.length})`, icon: Users },
+                { id: 'audio', label: 'Audio', icon: Sliders },
+                { id: 'notes', label: 'Notes', icon: FileText },
+              ].map(({ id, label, icon: Icon }) => (
                 <button
-                  key={item.id}
+                  key={id}
                   type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    playStudioSfx(item.id);
-                    socketRef.current?.emit('sfx:trigger', {
-                      code: meeting.code,
-                      sfx: item.id,
-                    });
+                  className={`btn btn-sm ${activeTab === id ? 'btn-secondary' : 'btn-ghost'}`}
+                  style={{
+                    borderColor: activeTab === id ? 'var(--border-default)' : 'transparent',
+                    color: activeTab === id ? 'var(--text-primary)' : 'var(--text-muted)',
                   }}
+                  onClick={() => setActiveTab(id)}
                 >
-                  {item.emoji} {item.label}
+                  <Icon size={12} style={{ flexShrink: 0 }} /> {label}
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Composite Episode Recorder + SounZ AI Live Voice Dub */}
+            {/* Tab 1: Transcript & Room Chat */}
+            {activeTab === 'chat' && (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12, gap: 10 }}>
+                <form onSubmit={handleSearchMessages} style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    className="input"
+                    style={{ height: 32, fontSize: '0.8rem' }}
+                    placeholder="Search transcript..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-icon btn-sm"
+                      onClick={() => {
+                        setSearchQuery('');
+                        handleSearchMessages(null, '');
+                      }}
+                      title="Clear search"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                  <button type="submit" className="btn btn-secondary btn-icon btn-sm" title="Search">
+                    <Search size={13} />
+                  </button>
+                </form>
+
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {messages.map((m) => (
+                    <div
+                      key={m._id}
+                      style={{
+                        padding: '9px 11px',
+                        borderRadius: 'var(--radius-sm)',
+                        background:
+                          m.senderType === 'ai' ? 'rgba(201, 169, 110, 0.06)' : 'var(--bg-surface)',
+                        border:
+                          m.senderType === 'ai'
+                            ? '1px solid var(--accent-border)'
+                            : '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 4,
+                          fontSize: '0.72rem',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: m.senderType === 'ai' ? 'var(--accent)' : 'var(--text-primary)',
+                          }}
+                        >
+                          {m.senderName}
+                          {m.senderType === 'ai' ? ` · ${aiLabel}` : ''}
+                        </span>
+                        {m.isRapidFire && (
+                          <span className="badge badge-live" style={{ height: 18, fontSize: '0.62rem' }}>
+                            Rapid-Fire
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.48 }}>
+                        {m.content}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <form onSubmit={handleSendRoomChat} style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    className="input"
+                    style={{ height: 34, fontSize: '0.82rem' }}
+                    placeholder="Message studio room..."
+                    value={chatText}
+                    onChange={(e) => setChatText(e.target.value)}
+                    disabled={meeting.status === 'ended'}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-secondary btn-icon btn-sm"
+                    style={{ height: 34, width: 34 }}
+                    disabled={meeting.status === 'ended'}
+                  >
+                    <Send size={14} />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Tab 2: Stage Participants */}
+            {activeTab === 'audience' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="eyebrow" style={{ marginBottom: 2 }}>
+                  Live Roster ({participants.length})
+                </div>
+                {participants.map((p) => (
+                  <div
+                    key={p.socketId}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {p.name}
+                        {p.handRaised && <Hand size={13} color="var(--accent)" />}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                        {p.isHost ? 'Show Host' : p.role}
+                      </div>
+                    </div>
+                    {isHost && p.userId !== user._id && (
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-icon btn-sm"
+                        onClick={() => handleKickUser(p.userId)}
+                        title="Remove participant"
+                      >
+                        <UserX size={13} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab 3: AI & Audio Settings */}
+            {activeTab === 'audio' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: 10,
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <PersonaPortrait styleKey={meeting.aiPersona?.avatarStyle} size={44} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.86rem' }}>{meeting.aiPersona?.name}</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{aiLabel} · {meeting.showFormat}</div>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label className="field-label">AI Voice Synthesis Engine</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${voiceEngine === 'browser' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ flex: 1 }}
+                      onClick={() => setVoiceEngine('browser')}
+                    >
+                      Instant Browser
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${voiceEngine === 'sounz' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ flex: 1 }}
+                      onClick={() => setVoiceEngine('sounz')}
+                    >
+                      <AudioLines size={13} /> SounZ AI
+                    </button>
+                  </div>
+                </div>
+
+                {devices.video.length > 0 && (
+                  <div className="field">
+                    <label className="field-label" htmlFor="studio-cam-select">
+                      Camera Source
+                    </label>
+                    <select
+                      id="studio-cam-select"
+                      className="select"
+                      style={{ height: 34, fontSize: '0.8rem' }}
+                      value={selectedVideoId}
+                      onChange={(e) => {
+                        setSelectedVideoId(e.target.value);
+                        switchMediaDevices(e.target.value, selectedAudioId);
+                      }}
+                    >
+                      <option value="">System Default Camera</option>
+                      {devices.video.map((d, idx) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label || `Camera ${idx + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {devices.audio.length > 0 && (
+                  <div className="field">
+                    <label className="field-label" htmlFor="studio-mic-select">
+                      Microphone Source
+                    </label>
+                    <select
+                      id="studio-mic-select"
+                      className="select"
+                      style={{ height: 34, fontSize: '0.8rem' }}
+                      value={selectedAudioId}
+                      onChange={(e) => {
+                        setSelectedAudioId(e.target.value);
+                        switchMediaDevices(selectedVideoId, e.target.value);
+                      }}
+                    >
+                      <option value="">System Default Microphone</option>
+                      {devices.audio.map((d, idx) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label || `Microphone ${idx + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span>Mirror self-view camera</span>
+                  <input
+                    type="checkbox"
+                    checked={mirrorCamera}
+                    onChange={(e) => {
+                      setMirrorCamera(e.target.checked);
+                      saveStudioPrefs({ mirrorCamera: e.target.checked });
+                    }}
+                  />
+                </label>
+
+                <LiveVoiceDubPanel
+                  meetingId={meeting._id}
+                  defaultVoiceId={meeting.aiPersona?.sounzVoiceId || 'romantic_hero'}
+                />
+              </div>
+            )}
+
+            {/* Tab 4: Notes & Post-Production */}
+            {activeTab === 'notes' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleGenerateSummary}
+                  disabled={loadingSummary}
+                >
+                  <Sparkles size={13} />
+                  {loadingSummary ? 'Generating Highlights...' : 'Generate AI Show Notes'}
+                </button>
+
+                {summaryData && (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent)' }}>
+                      {summaryData.headline}
+                    </div>
+                    <ul style={{ margin: '0 0 0 16px', padding: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {(summaryData.highlights || []).map((h, i) => (
+                        <li key={i} style={{ marginBottom: 4 }}>
+                          {h}
+                        </li>
+                      ))}
+                    </ul>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        fontStyle: 'italic',
+                        borderLeft: '2px solid var(--accent)',
+                        paddingLeft: 8,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      “{summaryData.bestQuote}”
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={openFilmyWithSuggestedPrompt}
+                    >
+                      <Film size={13} /> Send Director Prompt to Filmy AI
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <Link to={`/studio/${meeting._id}`} className="btn btn-secondary btn-sm">
+                    <Film size={13} /> Open Post-Production Lab
+                  </Link>
+                  {isHost && (
+                    <Link to={`/meetings/${meeting._id}/report`} className="btn btn-secondary btn-sm">
+                      <BarChart3 size={13} /> Attendance &amp; Engagement Report
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+          </aside>
+        )}
+      </div>
+
+      {/* Bottom Riverside-Style Production Dock */}
+      <footer className="studio-dock">
+        {/* Left: Participant Media Controls */}
+        <div className="dock-group">
+          <button
+            type="button"
+            className={`btn btn-sm ${micOn ? 'btn-secondary' : 'btn-danger'}`}
+            onClick={toggleMic}
+            title={micOn ? 'Mute microphone' : 'Unmute microphone'}
+          >
+            {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+            <span>{micOn ? 'Mic' : 'Muted'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${camOn ? 'btn-secondary' : 'btn-danger'}`}
+            onClick={toggleCam}
+            title={camOn ? 'Disable camera' : 'Enable camera'}
+          >
+            {camOn ? <Video size={14} /> : <VideoOff size={14} />}
+            <span>{camOn ? 'Camera' : 'Off'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${screenStream ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={toggleScreenShare}
+            title="Share screen onto broadcast stage"
+          >
+            {screenStream ? <MonitorOff size={14} /> : <Monitor size={14} />}
+            <span>{screenStream ? 'Stop Share' : 'Share'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${handRaised ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={toggleHand}
+            title="Raise hand on stage"
+          >
+            <Hand size={14} />
+          </button>
+        </div>
+
+        {/* Center: Recording, Soundboard & AI Audio */}
+        <div className="dock-group" style={{ position: 'relative' }}>
           <BroadcastRecorder
             localVideoRef={localVideoRef}
             aiCanvasRef={aiCanvasRef}
+            screenVideoRef={screenVideoRef}
             localStreamRef={localStreamRef}
             remotePeers={remotePeers}
             remoteVideoMapRef={remoteVideoMapRef}
@@ -1082,248 +1590,109 @@ export default function ShowRoomPage() {
             aiRole={aiRole}
             lowerThirdText={lowerThird}
             suggestedFilmyPrompt={summaryData?.suggestedFilmyPrompt || ''}
+            onRecordingStateChange={setRecState}
           />
 
-          <LiveVoiceDubPanel
-            meetingId={meeting._id}
-            defaultVoiceId={meeting.aiPersona?.sounzVoiceId || 'romantic_hero'}
-          />
+          <button
+            type="button"
+            className={`btn btn-sm ${sfxOpen ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSfxOpen((o) => !o)}
+          >
+            <Music2 size={14} /> SFX
+          </button>
+
+          {sfxOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 46,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-md)',
+                padding: 8,
+                display: 'flex',
+                gap: 6,
+                boxShadow: 'var(--shadow-lg)',
+                zIndex: 40,
+                flexWrap: 'wrap',
+                minWidth: 340,
+                justifyContent: 'center',
+              }}
+            >
+              {SFX_OPTIONS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    playStudioSfx(item.id);
+                    socketRef.current?.emit('sfx:trigger', { code: meeting.code, sfx: item.id });
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className={`btn btn-sm ${voiceEngine === 'sounz' ? 'btn-positive' : 'btn-secondary'}`}
+            onClick={() => setVoiceEngine((v) => (v === 'sounz' ? 'browser' : 'sounz'))}
+            title="Switch between Browser speech and SounZ AI synthesis"
+          >
+            <AudioLines size={14} />
+            {voiceEngine === 'sounz' ? (sounzSynthesizing ? 'Synthesizing...' : 'SounZ Voice') : 'Browser Voice'}
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-icon btn-sm ${aiVoiceEnabled ? 'btn-secondary' : 'btn-danger'}`}
+            onClick={() => setAiVoiceEnabled((v) => !v)}
+            title={aiVoiceEnabled ? 'Mute AI output' : 'Unmute AI output'}
+          >
+            {aiVoiceEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+          </button>
         </div>
 
-        {/* Right Sidebar: Chat / Audience / Studio Controls */}
-        <aside className="card card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              type="button"
-              className={`btn btn-sm ${activeTab === 'chat' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ flex: 1 }}
-              onClick={() => setActiveTab('chat')}
-            >
-              Chat ({messages.length})
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${activeTab === 'audience' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ flex: 1 }}
-              onClick={() => setActiveTab('audience')}
-            >
-              Stage ({participants.length})
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${activeTab === 'controls' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ flex: 1 }}
-              onClick={() => setActiveTab('controls')}
-            >
-              Studio
-            </button>
-          </div>
-
-          {activeTab === 'chat' && (
-            <>
-              <form onSubmit={handleSearchMessages} style={{ display: 'flex', gap: 6 }}>
-                <input
-                  className="input"
-                  style={{ padding: '7px 10px', fontSize: '0.82rem' }}
-                  placeholder="Search transcript..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    title="Clear Search"
-                    onClick={() => {
-                      setSearchQuery('');
-                      handleSearchMessages(null, '');
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-                <button type="submit" className="btn btn-ghost btn-sm" title="Search Chat">
-                  <Search size={14} />
-                </button>
-              </form>
-
-              <div
-                style={{
-                  height: 410,
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  paddingRight: 4,
-                }}
-              >
-                {messages.map((m) => (
-                  <div
-                    key={m._id}
-                    className="glass-panel"
-                    style={{
-                      padding: '9px 11px',
-                      borderColor:
-                        m.senderType === 'ai' ? 'rgba(245, 176, 65, 0.35)' : 'var(--border-subtle)',
-                      background:
-                        m.senderType === 'ai'
-                          ? 'rgba(245, 176, 65, 0.08)'
-                          : 'rgba(255, 255, 255, 0.03)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontSize: '0.75rem',
-                        marginBottom: 3,
-                      }}
-                    >
-                      <strong
-                        style={{
-                          color:
-                            m.senderType === 'ai' ? 'var(--accent-gold)' : 'var(--accent-cyan)',
-                        }}
-                      >
-                        {m.senderName}
-                        {m.senderType === 'ai' ? ` • ${aiLabel.toUpperCase()}` : ''}
-                      </strong>
-                      {m.isRapidFire && (
-                        <span className="badge badge-live" style={{ fontSize: '0.62rem', padding: '1px 6px' }}>
-                          Rapid-Fire
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.87rem', lineHeight: 1.45 }}>{m.content}</div>
-                  </div>
-                ))}
-                <div ref={chatEndRef} />
-              </div>
-
-              <form onSubmit={handleSendRoomChat} style={{ display: 'flex', gap: 6 }}>
-                <input
-                  className="input"
-                  style={{ padding: '9px 12px' }}
-                  placeholder="Audience room chat..."
-                  value={chatText}
-                  onChange={(e) => setChatText(e.target.value)}
-                  disabled={meeting.status === 'ended'}
-                />
-                <button type="submit" className="btn btn-ghost btn-sm" disabled={meeting.status === 'ended'}>
-                  <Send size={15} />
-                </button>
-              </form>
-            </>
-          )}
-
-          {activeTab === 'audience' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
-              {participants.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem' }}>
-                  Connecting live participant roster...
-                </p>
-              ) : (
-                participants.map((p) => (
-                  <div
-                    key={p.socketId}
-                    className="glass-panel"
-                    style={{
-                      padding: '10px 12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>
-                        {p.name} {p.handRaised ? '✋' : ''}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        {p.isHost ? 'Show Host' : p.role}
-                      </div>
-                    </div>
-
-                    {isHost && p.userId !== user._id && (
-                      <button
-                        type="button"
-                        className="btn btn-crimson btn-sm"
-                        onClick={() => handleKickUser(p.userId)}
-                        title="Remove from show"
-                      >
-                        <UserX size={13} />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeTab === 'controls' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="glass-panel" style={{ padding: 12 }}>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Invite Guest Code</div>
-                <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 700, marginTop: 4 }}>
-                  {meeting.code}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-emerald btn-sm"
-                onClick={handleGenerateSummary}
-                disabled={loadingSummary}
-              >
-                <FileText size={15} />
-                {loadingSummary ? 'Generating AI Show Notes...' : 'Generate AI Episode Notes'}
-              </button>
-
-              {summaryData && (
-                <div className="glass-panel" style={{ padding: 12, fontSize: '0.82rem' }}>
-                  <div style={{ fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 6 }}>
-                    {summaryData.headline}
-                  </div>
-                  <ul style={{ margin: '0 0 8px 16px', padding: 0, color: 'var(--text-secondary)' }}>
-                    {(summaryData.highlights || []).map((h, i) => (
-                      <li key={i} style={{ marginBottom: 4 }}>
-                        {h}
-                      </li>
-                    ))}
-                  </ul>
-                  <div style={{ fontStyle: 'italic', color: '#fff', marginBottom: 8 }}>
-                    “{summaryData.bestQuote}”
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    style={{ width: '100%' }}
-                    onClick={openFilmyWithSuggestedPrompt}
-                  >
-                    <Film size={14} /> Send Prompt to Filmy AI Studio
-                  </button>
-                </div>
-              )}
-
-              <Link to={`/studio/${meeting._id}`} className="btn btn-primary btn-sm">
-                <Film size={15} /> Open Post-Production Studio
-              </Link>
-
-              {isHost && (
-                <Link to={`/meetings/${meeting._id}/report`} className="btn btn-ghost btn-sm">
-                  <BarChart3 size={15} /> View Attendance Report
-                </Link>
-              )}
-
-              {isHost && meeting.status !== 'ended' && (
-                <button type="button" className="btn btn-crimson btn-sm" onClick={handleEndShow}>
-                  <PhoneOff size={15} /> End Show &amp; Generate Report
-                </button>
-              )}
-            </div>
-          )}
-        </aside>
-      </div>
+        {/* Right: Panel Controls */}
+        <div className="dock-group">
+          <button
+            type="button"
+            className={`btn btn-icon btn-sm ${panelOpen && activeTab === 'chat' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => openPanelTab('chat')}
+            title="Transcript"
+          >
+            <MessageSquare size={14} />
+          </button>
+          <button
+            type="button"
+            className={`btn btn-icon btn-sm ${panelOpen && activeTab === 'audience' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => openPanelTab('audience')}
+            title="Stage Participants"
+          >
+            <Users size={14} />
+          </button>
+          <button
+            type="button"
+            className={`btn btn-icon btn-sm ${panelOpen && activeTab === 'audio' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => openPanelTab('audio')}
+            title="AI & Audio Settings"
+          >
+            <Sliders size={14} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            onClick={() => setPanelOpen((o) => !o)}
+            title={panelOpen ? 'Expand stage' : 'Open studio panel'}
+          >
+            {panelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+          </button>
+        </div>
+      </footer>
     </div>
   );
 }
