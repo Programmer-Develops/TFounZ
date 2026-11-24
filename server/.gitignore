@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+server/.env
+client/.env
+
+# Build artifacts
+dist/
+client/dist/
+build/
+
+# Logs & OS files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
