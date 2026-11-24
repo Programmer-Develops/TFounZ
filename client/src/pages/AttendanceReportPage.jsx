@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { BarChart3, Download, ArrowLeft } from 'lucide-react';
+import { Download, ArrowLeft, BarChart3 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { Badge, EmptyState, ErrorBanner, LoadingState } from '../components/ui/Primitives';
 
 export default function AttendanceReportPage() {
   const { id } = useParams();
@@ -58,20 +59,13 @@ export default function AttendanceReportPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (loading) {
-    return (
-      <div className="container page-shell">
-        <p style={{ color: 'var(--text-secondary)' }}>Running MongoDB attendance aggregation...</p>
-      </div>
-    );
-  }
-
+  if (loading) return <LoadingState label="Aggregating session attendance..." />;
   if (error) {
     return (
-      <div className="container page-shell">
-        <div className="alert-error">{error}</div>
-        <Link to="/history" className="btn btn-ghost btn-sm" style={{ marginTop: 14 }}>
-          <ArrowLeft size={14} /> Back to Shows
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <ErrorBanner message={error} />
+        <Link to="/history" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }}>
+          <ArrowLeft size={14} /> Back to Archive
         </Link>
       </div>
     );
@@ -80,68 +74,70 @@ export default function AttendanceReportPage() {
   const { meeting, summary, participants } = report;
 
   return (
-    <div className="container page-shell">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
         <div>
-          <span className="badge badge-gold" style={{ marginBottom: 8 }}>
-            MeetLite Aggregation Report · {meeting.code}
-          </span>
-          <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <BarChart3 size={24} color="var(--accent-gold)" /> {meeting.title}
-          </h1>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>
+            MongoDB Aggregation Report · <span className="mono">{meeting.code}</span>
+          </div>
+          <h1 style={{ fontSize: '1.65rem' }}>{meeting.title}</h1>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn btn-primary btn-sm" onClick={exportCsv}>
-            <Download size={15} /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
-          <Link to="/history" className="btn btn-ghost btn-sm">
-            <ArrowLeft size={15} /> Back
+          <Link to="/history" className="btn btn-secondary btn-sm">
+            <ArrowLeft size={14} /> Archive
           </Link>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid-4" style={{ marginBottom: 20 }}>
-        <div className="card card-compact">
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Participants</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 4 }}>{summary.totalParticipants}</div>
+      <div className="kpi-strip">
+        <div className="kpi-cell">
+          <div className="eyebrow">Participants</div>
+          <div className="tabular" style={{ fontSize: '1.45rem', fontWeight: 600, marginTop: 6 }}>
+            {summary.totalParticipants}
+          </div>
         </div>
-        <div className="card card-compact">
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Combined Watch Minutes</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 4, color: 'var(--accent-emerald)' }}>
+        <div className="kpi-cell">
+          <div className="eyebrow">Total Watch Time</div>
+          <div className="tabular" style={{ fontSize: '1.45rem', fontWeight: 600, marginTop: 6, color: 'var(--status-positive)' }}>
             {summary.totalMinutesAll} min
           </div>
         </div>
-        <div className="card card-compact">
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Messages Exchanged</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 4, color: 'var(--accent-cyan)' }}>
+        <div className="kpi-cell">
+          <div className="eyebrow">Messages</div>
+          <div className="tabular" style={{ fontSize: '1.45rem', fontWeight: 600, marginTop: 6 }}>
             {summary.totalMessages}
           </div>
         </div>
-        <div className="card card-compact">
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Peak Rapid-Fire Score</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 4, color: 'var(--accent-gold)' }}>
+        <div className="kpi-cell">
+          <div className="eyebrow">Rapid-Fire Peak</div>
+          <div className="tabular" style={{ fontSize: '1.45rem', fontWeight: 600, marginTop: 6, color: 'var(--accent)' }}>
             {summary.peakRapidFireScore} pts
           </div>
         </div>
       </div>
 
-      <div className="card">
-        <h2 style={{ fontSize: '1.2rem', marginBottom: 14 }}>Per-Participant Attendance Breakdown</h2>
+      <div className="surface">
         {participants.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)' }}>No attendance records captured for this show yet.</p>
+          <EmptyState
+            icon={BarChart3}
+            title="No attendance logs yet"
+            description="Participants are logged automatically as they join and leave the studio room."
+          />
         ) : (
           <div className="table-wrap">
-            <table className="studio-table">
+            <table className="editorial-table">
               <thead>
                 <tr>
                   <th>Participant</th>
                   <th>Role</th>
-                  <th>Join Time</th>
-                  <th>Leave Time</th>
-                  <th>Total Minutes</th>
-                  <th>Hands Raised</th>
+                  <th>First Join</th>
+                  <th>Last Leave</th>
+                  <th>Duration</th>
+                  <th>Hands</th>
                   <th>Messages</th>
                   <th>Rapid-Fire</th>
                 </tr>
@@ -150,26 +146,28 @@ export default function AttendanceReportPage() {
                 {participants.map((p) => (
                   <tr key={p.userId}>
                     <td>
-                      <div style={{ fontWeight: 700 }}>{p.name}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{p.email}</div>
+                      <div style={{ fontWeight: 600 }}>{p.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.email}</div>
                     </td>
                     <td>
-                      <span className="badge badge-violet">{p.role}</span>
+                      <Badge>{p.role}</Badge>
                     </td>
-                    <td>{new Date(p.firstJoinTime).toLocaleString()}</td>
-                    <td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {new Date(p.firstJoinTime).toLocaleString()}
+                    </td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       {p.stillActive ? (
-                        <span className="badge badge-live">Active Now</span>
+                        <Badge tone="live">Active</Badge>
                       ) : (
                         new Date(p.lastLeaveTime).toLocaleString()
                       )}
                     </td>
-                    <td style={{ fontWeight: 700, color: 'var(--accent-emerald)' }}>
+                    <td className="tabular" style={{ fontWeight: 600, color: 'var(--status-positive)' }}>
                       {p.totalMinutes} min
                     </td>
-                    <td>{p.raisedHandCount}</td>
-                    <td>{p.messagesSent}</td>
-                    <td>{p.rapidFireScore} pts</td>
+                    <td className="tabular">{p.raisedHandCount}</td>
+                    <td className="tabular">{p.messagesSent}</td>
+                    <td className="tabular">{p.rapidFireScore} pts</td>
                   </tr>
                 ))}
               </tbody>
