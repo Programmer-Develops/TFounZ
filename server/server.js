@@ -12,7 +12,10 @@ async function startServer() {
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: {
-        origin: env.clientUrl,
+        origin(origin, callback) {
+          if (env.isOriginAllowed(origin)) return callback(null, true);
+          return callback(new Error(`Socket CORS blocked for origin: ${origin}`));
+        },
         methods: ['GET', 'POST', 'PATCH', 'DELETE'],
         credentials: true,
       },
