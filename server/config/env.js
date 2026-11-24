@@ -38,6 +38,17 @@ const env = {
     if (!origin) return true;
     const normalized = stripTrailingSlash(origin);
     if (allowedOrigins.includes('*') || allowedOrigins.includes(normalized)) return true;
+
+    // Allow Vercel preview deployment URLs for any configured *.vercel.app project origin
+    // e.g. CLIENT_URL=https://t-founz.vercel.app also permits https://t-founz-<hash>-<team>.vercel.app
+    for (const allowed of allowedOrigins) {
+      const match = allowed.match(/^https:\/\/([a-z0-9-]+)\.vercel\.app$/i);
+      if (match) {
+        const projectPrefix = match[1].toLowerCase();
+        const previewRegex = new RegExp(`^https://${projectPrefix}-[a-z0-9-]+\\.vercel\\.app$`, 'i');
+        if (previewRegex.test(normalized)) return true;
+      }
+    }
     return false;
   },
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),

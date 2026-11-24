@@ -22,6 +22,15 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'success',
+    service: 'TFounZ AI Talk Show Studio API',
+    health: '/api/health',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'success',
