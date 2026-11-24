@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { LoadingState } from './ui/Primitives';
 
 export default function ProtectedRoute({ children, allowedRoles = null }) {
   const { isAuthenticated, user, loading } = useAuth();
@@ -8,8 +9,8 @@ export default function ProtectedRoute({ children, allowedRoles = null }) {
 
   if (loading) {
     return (
-      <div className="container page-shell" style={{ textAlign: 'center', paddingTop: '80px' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Connecting to TFounZ Studio...</p>
+      <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+        <LoadingState label="Verifying studio session..." />
       </div>
     );
   }
@@ -20,14 +21,12 @@ export default function ProtectedRoute({ children, allowedRoles = null }) {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
-      <div className="container page-shell">
-        <div className="card" style={{ maxWidth: 540, margin: '40px auto', textAlign: 'center' }}>
-          <h2 style={{ marginBottom: 10 }}>Access Restricted</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 18 }}>
-            Your current role (<strong>{user.role}</strong>) cannot view this page. Required:{' '}
-            <strong>{allowedRoles.join(', ')}</strong>.
-          </p>
-        </div>
+      <div style={{ maxWidth: 480, margin: '64px auto', padding: 24 }} className="surface">
+        <h2 style={{ fontSize: '1.15rem', marginBottom: 8 }}>Access Restricted</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+          Your current role (<strong>{user.role}</strong>) does not have permission to open this
+          section. Required: <strong>{allowedRoles.join(', ')}</strong>.
+        </p>
       </div>
     );
   }

@@ -1,31 +1,59 @@
 :root {
-  --bg-void: #09080f;
-  --bg-stage: #110f1a;
-  --bg-card: rgba(24, 21, 37, 0.85);
-  --bg-card-solid: #181525;
-  --bg-elevated: #221e35;
+  /* Core Surfaces — Obsidian & Deep Charcoal */
+  --bg-stage: #070709;
+  --bg-base: #0b0b0d;
+  --bg-rail: #0f0f12;
+  --bg-surface: #141418;
+  --bg-elevated: #1b1b21;
+  --bg-hover: #222229;
 
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(245, 176, 65, 0.35);
+  /* Hairline Borders */
+  --border-subtle: rgba(245, 242, 235, 0.07);
+  --border-default: rgba(245, 242, 235, 0.12);
+  --border-strong: rgba(245, 242, 235, 0.22);
 
-  --text-primary: #f7f5ff;
-  --text-secondary: #b4aec9;
-  --text-muted: #797291;
+  /* Typography — Warm Ivory & Stone */
+  --text-primary: #f5f2eb;
+  --text-secondary: #a6a29b;
+  --text-muted: #6e6b66;
+  --text-inverse: #0e0d0b;
 
-  --accent-gold: #f5b041;
-  --accent-crimson: #ff4d6d;
-  --accent-emerald: #2ee59d;
-  --accent-cyan: #38bdf8;
-  --accent-violet: #a855f7;
+  /* Accents — Muted Champagne Gold & Editorial Statuses */
+  --accent: #c9a96e;
+  --accent-hover: #d7ba83;
+  --accent-soft: rgba(201, 169, 110, 0.12);
+  --accent-border: rgba(201, 169, 110, 0.34);
 
-  --font-display: 'Outfit', system-ui, sans-serif;
-  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --status-positive: #7da88b;
+  --status-positive-soft: rgba(125, 168, 139, 0.13);
+  --status-positive-border: rgba(125, 168, 139, 0.32);
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --shadow-stage: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --status-live: #c84b53;
+  --status-live-soft: rgba(200, 75, 83, 0.15);
+  --status-live-border: rgba(200, 75, 83, 0.38);
+
+  --status-warn: #c4934e;
+  --status-warn-soft: rgba(196, 147, 78, 0.14);
+
+  /* Type Scale */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Controlled Geometry */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  /* Restrained Elevation */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.48);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.65);
+
+  /* Layout Metrics */
+  --rail-width: 232px;
+  --topbar-height: 52px;
 }
 
 *,
@@ -35,28 +63,29 @@
 }
 
 html,
-body {
+body,
+#root {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background-color: var(--bg-void);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(168, 85, 247, 0.14), transparent 60%),
-    radial-gradient(ellipse 70% 45% at 85% 10%, rgba(245, 176, 65, 0.12), transparent 60%),
-    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(255, 77, 109, 0.08), transparent 65%);
-  background-attachment: fixed;
+  background: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
 h2,
 h3,
-h4 {
-  font-family: var(--font-display);
+h4,
+h5 {
   margin: 0;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
 }
 
 p {
@@ -73,27 +102,46 @@ input,
 select,
 textarea {
   font-family: inherit;
+  font-size: inherit;
 }
 
-code,
 .mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(245, 242, 235, 0.14);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 176, 65, 0.45);
+  background: rgba(201, 169, 110, 0.4);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
