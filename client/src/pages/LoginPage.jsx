@@ -27,10 +27,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemo = (email) => {
-    setForm({ email, password: 'Password123!' });
-  };
-
   return (
     <div className="container page-shell">
       <div className="card" style={{ maxWidth: 460, margin: '28px auto' }}>
@@ -59,8 +55,9 @@ export default function LoginPage() {
               id="login-email"
               type="email"
               required
+              autoComplete="email"
               className="input"
-              placeholder="host@tfounz.studio"
+              placeholder="you@example.com"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
@@ -74,6 +71,7 @@ export default function LoginPage() {
               id="login-password"
               type="password"
               required
+              autoComplete="current-password"
               className="input"
               placeholder="••••••••"
               value={form.password}
@@ -85,26 +83,6 @@ export default function LoginPage() {
             <LogIn size={16} /> {submitting ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-
-        <div
-          className="glass-panel"
-          style={{ marginTop: 18, padding: '12px 14px', fontSize: '0.82rem' }}
-        >
-          <div style={{ color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>
-            Quick Fill Seeded Demo Accounts (<span className="mono">Password123!</span>):
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => fillDemo('host@tfounz.studio')}>
-              Host
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => fillDemo('guest@tfounz.studio')}>
-              Participant
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => fillDemo('admin@tfounz.studio')}>
-              Admin
-            </button>
-          </div>
-        </div>
 
         <p style={{ marginTop: 18, fontSize: '0.88rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
           New to TFounZ Studio?{' '}
