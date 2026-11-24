@@ -1,414 +1,394 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
-  Tv,
   PlusCircle,
-  RefreshCw,
-  LogIn,
-  BarChart3,
-  Film,
-  Sparkles,
+  ArrowRight,
   Users,
-  Mic,
-  Star,
+  Film,
+  BarChart3,
+  Radio,
+  Sparkles,
+  Play,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useStudio } from '../context/StudioContext';
 import { apiFetch } from '../utils/api';
+import PersonaPortrait from '../components/ui/PersonaPortrait';
+import { Badge, EmptyState, LoadingState } from '../components/ui/Primitives';
 
 export default function DashboardPage() {
   const { user, isHost } = useAuth();
-  const { presets, guestPresets, voices, health, refreshHealth } = useStudio();
-  const navigate = useNavigate();
+  const { guestPresets, presets } = useStudio();
 
-  const [joinCode, setJoinCode] = useState('');
-  const [recentMeetings, setRecentMeetings] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [experienceTab, setExperienceTab] = useState('host'); // 'host' | 'guest'
+  const [meetings, setMeetings] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    showFormat: 'chai-with-ai',
-    mode: 'ai-talkshow',
-    aiRole: 'host',
-    customVoiceId: '',
-  });
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
-
-  const loadRecent = useCallback(async () => {
-    setLoadingHistory(true);
+  const loadOverview = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await apiFetch('/api/meetings/history');
-      setRecentMeetings(res?.data?.meetings || []);
+      const [mRes, jRes] = await Promise.all([
+        apiFetch('/api/meetings/history'),
+        apiFetch('/api/studio/jobs'),
+      ]);
+      setMeetings(mRes?.data?.meetings || []);
+      setJobs(jRes?.data?.jobs || []);
     } catch {
-      // handled softly
+      // handled gracefully
     } finally {
-      setLoadingHistory(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadRecent();
-  }, [loadRecent]);
+    loadOverview();
+  }, [loadOverview]);
 
-  const displayedPresets = experienceTab === 'guest' ? guestPresets : presets;
+  const liveShow = meetings.find((m) => m.status === 'live');
+  const latestEnded = meetings.find((m) => m.status === 'ended');
+  const totalMessages = meetings.reduce((acc, m) => acc + (m.messageCount || 0), 0);
+  const peakRapidFire = meetings.reduce((acc, m) => Math.max(acc, m.rapidFireHighScore || 0), 0);
+  const completedJobs = jobs.filter((j) => j.status === 'completed');
 
-  const switchExperience = (tab) => {
-    setExperienceTab(tab);
-    const list = tab === 'guest' ? guestPresets : presets;
-    const first = list[0];
-    if (first) {
-      setForm((prev) => ({
-        ...prev,
-        showFormat: first.id,
-        mode: first.defaultMode || 'ai-talkshow',
-        aiRole: first.defaultAiRole || (tab === 'guest' ? 'guest' : 'host'),
-        customVoiceId: first.sounzVoiceId || '',
-        title: `${first.showTitle} ft. ${user?.name || 'Guest'}`,
-      }));
-    }
-  };
-
-  const handlePresetPick = (preset) => {
-    setForm((prev) => ({
-      ...prev,
-      showFormat: preset.id,
-      mode: preset.defaultMode || 'ai-talkshow',
-      aiRole: preset.defaultAiRole || (experienceTab === 'guest' ? 'guest' : 'host'),
-      customVoiceId: preset.sounzVoiceId,
-      title: `${preset.showTitle} ft. ${user?.name || 'Guest'}`,
-    }));
-  };
-
-  const handleCreateShow = async (e) => {
-    e.preventDefault();
-    setError('');
-    setCreating(true);
-    try {
-      const res = await apiFetch('/api/meetings', {
-        method: 'POST',
-        body: JSON.stringify(form),
-      });
-      const meeting = res?.data?.meeting;
-      if (meeting?.code) {
-        navigate(`/room/${meeting.code}`);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleJoinCode = (e) => {
-    e.preventDefault();
-    const cleaned = joinCode.trim().toUpperCase();
-    if (!cleaned) return;
-    navigate(`/room/${cleaned}`);
-  };
-
-  const voiceOptions = [
-    ...(voices.human_actor_zero_shot || []),
-    ...(voices.cartoon_anime_rvc || []),
-  ];
+  const featuredGuests = (guestPresets.length ? guestPresets : presets).slice(0, 4);
 
   return (
-    <div className="container page-shell">
-      {/* Top Banner + Join Bar */}
-      <div
-        className="card"
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {/* Editorial Welcome Header */}
+      <section
         style={{
-          marginBottom: 22,
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           justifyContent: 'space-between',
           gap: 18,
           flexWrap: 'wrap',
         }}
       >
         <div>
-          <span className="badge badge-gold" style={{ marginBottom: 8 }}>
-            Studio Control Room
-          </span>
-          <h1 style={{ fontSize: '1.85rem' }}>Welcome back, {user?.name}</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginTop: 4 }}>
-            Step onto an AI-hosted talk couch, interview a celebrity AI Guest, or open a multi-guest
-            WebRTC broadcast room.
+          <div className="eyebrow" style={{ marginBottom: 6 }}>
+            Creator Studio Overview
+          </div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 600 }}>
+            Welcome back, {user?.name?.split(' ')[0]}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', marginTop: 4, fontSize: '0.9rem' }}>
+            Direct live talk shows, interview AI guests, and cut broadcast highlights from one workspace.
           </p>
         </div>
 
-        <form onSubmit={handleJoinCode} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            className="input mono"
-            style={{ width: 220 }}
-            placeholder="Enter Code (TFZ-...)"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-          />
-          <button type="submit" className="btn btn-primary">
-            <LogIn size={16} /> Join Show
-          </button>
-        </form>
-      </div>
-
-      {/* AI Spaces Health Bar */}
-      <div className="card card-compact" style={{ marginBottom: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <strong style={{ fontSize: '0.9rem' }}>Connected AI Engines:</strong>
-            <span className={`badge ${health.sounzAi?.online ? 'badge-emerald' : 'badge-gold'}`}>
-              SounZ AI ({health.sounzAi?.online ? 'Online' : 'Waking / Standby'})
-            </span>
-            <span className={`badge ${health.filmyAi?.online ? 'badge-cyan' : 'badge-gold'}`}>
-              Filmy AI ({health.filmyAi?.online ? 'Online' : 'Waking / Standby'})
-            </span>
-            <span className={`badge ${health.gemini?.configured ? 'badge-violet' : 'badge-gold'}`}>
-              Gemini ({health.gemini?.configured ? health.gemini.model || 'Ready' : 'Fallback Active'})
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={refreshHealth}
-            disabled={health.checking}
-          >
-            <RefreshCw size={14} />
-            {health.checking ? 'Pinging Spaces...' : 'Wake / Refresh Spaces'}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid-2" style={{ alignItems: 'start' }}>
-        {/* Left: Start New Show (Host / Admin RBAC) */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Tv size={20} color="var(--accent-gold)" />
-              <h2 style={{ fontSize: '1.35rem' }}>Create &amp; Go On Air</h2>
-            </div>
-            {!isHost && <span className="badge badge-live">Host Role Required</span>}
-          </div>
-
-          {!isHost ? (
-            <div className="glass-panel" style={{ padding: 16, color: 'var(--text-secondary)', fontSize: '0.92rem' }}>
-              You are logged in as a <strong>Participant</strong>. Use the{' '}
-              <strong>Join Show</strong> box above with a host’s <span className="mono">TFZ-...</span>{' '}
-              code, or explore the <strong>Post-Production Studio</strong>!
-            </div>
-          ) : (
-            <form onSubmit={handleCreateShow} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {error && <div className="alert-error">{error}</div>}
-
-              {/* Experience Switcher: AI Host vs AI Guest */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${experienceTab === 'host' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ flex: 1 }}
-                  onClick={() => switchExperience('host')}
-                >
-                  <Mic size={14} /> AI Interviews Me (AI Host)
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${experienceTab === 'guest' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ flex: 1 }}
-                  onClick={() => switchExperience('guest')}
-                >
-                  <Star size={14} /> I Interview AI (AI Guest)
-                </button>
-              </div>
-
-              <div>
-                <label className="field-label">
-                  1. Pick a {experienceTab === 'guest' ? 'Celebrity AI Guest' : 'Talk Show Format'}
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-                  {displayedPresets.map((p) => {
-                    const active = form.showFormat === p.id;
-                    return (
-                      <button
-                        type="button"
-                        key={p.id}
-                        onClick={() => handlePresetPick(p)}
-                        style={{
-                          textAlign: 'left',
-                          padding: '10px 12px',
-                          borderRadius: 10,
-                          border: active
-                            ? `1.5px solid ${p.accentColor}`
-                            : '1px solid var(--border-subtle)',
-                          background: active
-                            ? 'rgba(245, 176, 65, 0.1)'
-                            : 'rgba(11, 10, 19, 0.75)',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: '0.86rem', color: active ? p.accentColor : '#fff' }}>
-                          {p.showTitle}
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                          {p.name}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="show-title">
-                  2. Episode / Meeting Title
-                </label>
-                <input
-                  id="show-title"
-                  required
-                  minLength={3}
-                  className="input"
-                  placeholder="Chai with Karan AI — Late Night Special"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                />
-              </div>
-
-              <div className="grid-2">
-                <div>
-                  <label className="field-label" htmlFor="show-mode">
-                    Stage Mode
-                  </label>
-                  <select
-                    id="show-mode"
-                    className="select"
-                    value={form.mode}
-                    onChange={(e) => setForm({ ...form, mode: e.target.value })}
-                  >
-                    <option value="ai-talkshow">Solo Talk Couch (+ Optional Guests)</option>
-                    <option value="live-studio">Multi-Guest WebRTC Studio + Audience</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="field-label" htmlFor="show-voice">
-                    SounZ AI Character Voice
-                  </label>
-                  <select
-                    id="show-voice"
-                    className="select"
-                    value={form.customVoiceId}
-                    onChange={(e) => setForm({ ...form, customVoiceId: e.target.value })}
-                  >
-                    <option value="">Default Preset Voice</option>
-                    {voiceOptions.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.emoji || '🎙️'} {v.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="show-desc">
-                  Episode Description (Optional)
-                </label>
-                <input
-                  id="show-desc"
-                  className="input"
-                  placeholder="Rapid-fire questions, live audience Q&A, and Filmy AI highlights"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-              </div>
-
-              <button type="submit" className="btn btn-primary" disabled={creating}>
-                <PlusCircle size={17} /> {creating ? 'Starting Studio...' : 'Launch Studio Room'}
-              </button>
-            </form>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Link to="/guests" className="btn btn-secondary">
+            <Users size={15} /> Browse AI Guests
+          </Link>
+          {isHost && (
+            <Link to="/shows/new" className="btn btn-primary">
+              <PlusCircle size={15} /> Create New Show
+            </Link>
           )}
         </div>
+      </section>
 
-        {/* Right: Recent Shows */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Sparkles size={20} color="var(--accent-cyan)" />
-              <h2 style={{ fontSize: '1.35rem' }}>Your Recent Shows</h2>
+      {/* Restrained KPI Strip (Single Bordered Hairline Row) */}
+      <section className="kpi-strip">
+        <div className="kpi-cell">
+          <div className="eyebrow">Total Shows</div>
+          <div className="tabular" style={{ fontSize: '1.5rem', fontWeight: 600, marginTop: 6 }}>
+            {meetings.length}
+          </div>
+        </div>
+        <div className="kpi-cell">
+          <div className="eyebrow">Studio Productions</div>
+          <div className="tabular" style={{ fontSize: '1.5rem', fontWeight: 600, marginTop: 6, color: 'var(--status-positive)' }}>
+            {completedJobs.length}
+          </div>
+        </div>
+        <div className="kpi-cell">
+          <div className="eyebrow">Transcript Turns</div>
+          <div className="tabular" style={{ fontSize: '1.5rem', fontWeight: 600, marginTop: 6 }}>
+            {totalMessages}
+          </div>
+        </div>
+        <div className="kpi-cell">
+          <div className="eyebrow">Rapid-Fire Record</div>
+          <div className="tabular" style={{ fontSize: '1.5rem', fontWeight: 600, marginTop: 6, color: 'var(--accent)' }}>
+            {peakRapidFire} <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>pts</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Continue Live / Continue Editing Spotlight Strip */}
+      {(liveShow || latestEnded) && (
+        <section
+          className="surface"
+          style={{
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            borderColor: liveShow ? 'var(--status-live-border)' : 'var(--accent-border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <PersonaPortrait
+              styleKey={(liveShow || latestEnded).aiPersona?.avatarStyle}
+              size={46}
+            />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Badge tone={liveShow ? 'live' : 'accent'}>
+                  {liveShow ? 'On Air Now' : 'Continue Editing'}
+                </Badge>
+                <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {(liveShow || latestEnded).code}
+                </span>
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '0.98rem' }}>
+                {(liveShow || latestEnded).title}
+              </div>
             </div>
-            <Link to="/history" className="btn btn-ghost btn-sm">
-              View All
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {liveShow ? (
+              <Link to={`/room/${liveShow.code}`} className="btn btn-primary btn-sm">
+                <Radio size={14} /> Rejoin Broadcast Stage
+              </Link>
+            ) : (
+              <>
+                <Link to={`/studio/${latestEnded._id}`} className="btn btn-primary btn-sm">
+                  <Film size={14} /> Open Post-Production
+                </Link>
+                {isHost && (
+                  <Link to={`/meetings/${latestEnded._id}/report`} className="btn btn-secondary btn-sm">
+                    <BarChart3 size={14} /> Attendance Report
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Recent Shows Editorial Table */}
+      <section className="section-block">
+        <div className="section-header">
+          <div>
+            <h2 style={{ fontSize: '1.12rem' }}>Recent Shows</h2>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+              Your live broadcasts, AI interviews, and scheduled episodes.
+            </p>
+          </div>
+          <Link to="/history" className="btn btn-ghost btn-sm">
+            Full Archive <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <div className="surface">
+          {loading ? (
+            <LoadingState label="Loading shows..." />
+          ) : meetings.length === 0 ? (
+            <EmptyState
+              icon={Radio}
+              title="No shows recorded yet"
+              description="Create your first AI Talk Show or live multi-guest broadcast room to begin."
+              action={
+                isHost ? (
+                  <Link to="/shows/new" className="btn btn-primary btn-sm">
+                    <PlusCircle size={14} /> Create First Show
+                  </Link>
+                ) : null
+              }
+            />
+          ) : (
+            <div className="table-wrap">
+              <table className="editorial-table">
+                <thead>
+                  <tr>
+                    <th>Episode</th>
+                    <th>AI Persona</th>
+                    <th>Status</th>
+                    <th>Engagement</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {meetings.slice(0, 6).map((m) => (
+                    <tr key={m._id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{m.title}</div>
+                        <div className="mono" style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {m.code} · {new Date(m.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <PersonaPortrait styleKey={m.aiPersona?.avatarStyle} size={32} />
+                          <div>
+                            <div style={{ fontSize: '0.84rem', fontWeight: 500 }}>{m.aiPersona?.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                              AI {m.aiRole || 'host'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <Badge
+                          tone={m.status === 'live' ? 'live' : m.status === 'ended' ? 'neutral' : 'accent'}
+                        >
+                          {m.status}
+                        </Badge>
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }} className="tabular">
+                        {m.uniqueParticipantCount || 0} guests · {m.messageCount || 0} turns
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          {m.status !== 'ended' && (
+                            <Link to={`/room/${m.code}`} className="btn btn-primary btn-sm">
+                              <Play size={12} /> Stage
+                            </Link>
+                          )}
+                          <Link to={`/studio/${m._id}`} className="btn btn-secondary btn-sm">
+                            Edit
+                          </Link>
+                          {isHost && (
+                            <Link to={`/meetings/${m._id}/report`} className="btn btn-ghost btn-sm">
+                              Report
+                            </Link>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Lower Two-Column Editorial Split: AI Guest Discovery + Recent Productions */}
+      <section className="section-block grid-2" style={{ alignItems: 'start', gap: 24 }}>
+        {/* AI Guest Discovery */}
+        <div>
+          <div className="section-header">
+            <div>
+              <h2 style={{ fontSize: '1.08rem' }}>Featured AI Guests</h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                Invite an AI celebrity or character onto your couch.
+              </p>
+            </div>
+            <Link to="/guests" className="btn btn-ghost btn-sm">
+              All Guests <ArrowRight size={13} />
             </Link>
           </div>
 
-          {loadingHistory ? (
-            <p style={{ color: 'var(--text-secondary)' }}>Loading studio history...</p>
-          ) : recentMeetings.length === 0 ? (
-            <div className="glass-panel" style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)' }}>
-              No shows yet. Launch your first AI Talk Show on the left!
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {recentMeetings.slice(0, 6).map((m) => (
-                <div
-                  key={m._id}
-                  className="glass-panel"
-                  style={{
-                    padding: '12px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span
-                        className={`badge ${
-                          m.status === 'live'
-                            ? 'badge-live'
-                            : m.status === 'ended'
-                              ? 'badge-gold'
-                              : 'badge-cyan'
-                        }`}
-                      >
-                        {m.status}
-                      </span>
-                      <span className="badge badge-violet" style={{ fontSize: '0.68rem' }}>
-                        AI {m.aiRole || 'host'}
-                      </span>
-                      <span className="mono" style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {m.code}
-                      </span>
+          <div className="surface">
+            {featuredGuests.map((guest) => (
+              <div key={guest.id} className="list-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  <PersonaPortrait styleKey={guest.avatarStyle} size={40} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{guest.name}</div>
+                    <div
+                      style={{
+                        fontSize: '0.77rem',
+                        color: 'var(--text-secondary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 290,
+                      }}
+                    >
+                      {guest.tagline}
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: '0.96rem' }}>{m.title}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                      <Users size={12} style={{ verticalAlign: 'middle' }} /> {m.uniqueParticipantCount || 0} guests ·{' '}
-                      {m.messageCount || 0} messages
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {m.status !== 'ended' && (
-                      <Link to={`/room/${m.code}`} className="btn btn-primary btn-sm">
-                        Enter
-                      </Link>
-                    )}
-                    <Link to={`/meetings/${m._id}/report`} className="btn btn-ghost btn-sm" title="Attendance Report">
-                      <BarChart3 size={14} /> Report
-                    </Link>
-                    <Link to={`/studio/${m._id}`} className="btn btn-ghost btn-sm" title="Filmy & SounZ Studio">
-                      <Film size={14} /> Studio
-                    </Link>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                <Link
+                  to={`/shows/new?persona=${encodeURIComponent(guest.id)}`}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Invite
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+
+        {/* Recent Productions & Activity */}
+        <div>
+          <div className="section-header">
+            <div>
+              <h2 style={{ fontSize: '1.08rem' }}>Recent Productions</h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                Filmy AI video edits and SounZ AI audio masters.
+              </p>
+            </div>
+            <Link to="/studio" className="btn btn-ghost btn-sm">
+              Media Library <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div className="surface">
+            {jobs.length === 0 ? (
+              <EmptyState
+                icon={Sparkles}
+                title="No productions yet"
+                description="Record a broadcast clip or upload audio in Productions to master with Filmy AI & SounZ AI."
+                action={
+                  <Link to="/studio" className="btn btn-secondary btn-sm">
+                    Open Productions
+                  </Link>
+                }
+              />
+            ) : (
+              jobs.slice(0, 5).map((job) => (
+                <div key={job._id} className="list-row">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <Badge tone={job.engine === 'filmy-ai' ? 'accent' : 'positive'}>
+                        {job.engine}
+                      </Badge>
+                      <Badge
+                        tone={
+                          job.status === 'completed'
+                            ? 'positive'
+                            : job.status === 'failed'
+                              ? 'live'
+                              : 'warn'
+                        }
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.84rem',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 340,
+                      }}
+                    >
+                      {job.instruction}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={11} /> {new Date(job.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <Link to="/studio" className="btn btn-ghost btn-sm">
+                    Open
+                  </Link>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
