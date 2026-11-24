@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Tv, Mic, Film, Sparkles, Radio, Users, ArrowRight } from 'lucide-react';
+import { ArrowRight, Radio, AudioLines, Film, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useStudio } from '../context/StudioContext';
+import Navbar from '../components/Navbar';
+import PersonaPortrait from '../components/ui/PersonaPortrait';
+import { Badge } from '../components/ui/Primitives';
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
-  const { presets } = useStudio();
+  const { presets, guestPresets } = useStudio();
   const [code, setCode] = useState('');
   const navigate = useNavigate();
 
@@ -21,140 +24,187 @@ export default function LandingPage() {
     }
   };
 
+  const featuredRoster = [...guestPresets.slice(0, 2), ...presets.slice(0, 4)].slice(0, 6);
+
   return (
-    <div className="container page-shell">
-      {/* Hero */}
-      <section
-        className="card"
-        style={{
-          padding: '42px 32px',
-          background:
-            'radial-gradient(circle at 85% 20%, rgba(245, 176, 65, 0.16), transparent 45%), radial-gradient(circle at 15% 80%, rgba(255, 77, 109, 0.14), transparent 50%), rgba(20, 17, 32, 0.92)',
-          marginBottom: 28,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 820 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <span className="badge badge-live">
-              <span className="pulse-dot" /> ON AIR • MERN + WEBRTC + AI STUDIO
-            </span>
-            <span className="badge badge-gold">Powered by Filmy AI &amp; SounZ AI</span>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+      <Navbar />
+
+      <main className="container" style={{ paddingTop: 56, paddingBottom: 88 }}>
+        {/* Editorial Hero */}
+        <section
+          className="landing-hero-grid"
+          style={{
+            paddingBottom: 56,
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div className="eyebrow" style={{ color: 'var(--accent)', letterSpacing: '0.14em' }}>
+              Virtual Talk Show Studio
+            </div>
+
+            <h1 style={{ fontSize: 'clamp(2.1rem, 4vw, 3.15rem)', lineHeight: 1.08, fontWeight: 600 }}>
+              Direct your own{' '}
+              <span style={{ color: 'var(--accent)' }}>AI-hosted talk show</span> in the browser.
+            </h1>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', lineHeight: 1.65, maxWidth: 540 }}>
+              TFounZ is a virtual production studio for conversational video shows. Host live interviews
+              with AI celebrity guests, invite human co-hosts over WebRTC, record mixed broadcasts, and
+              master every cut with SounZ AI and Filmy AI.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+              <Link to={isAuthenticated ? '/dashboard' : '/register'} className="btn btn-primary btn-lg">
+                <Radio size={16} /> {isAuthenticated ? 'Enter Studio' : 'Launch Your Studio'}
+                <ArrowRight size={15} />
+              </Link>
+
+              <form onSubmit={handleJoin} style={{ display: 'flex', gap: 6 }}>
+                <input
+                  className="input mono"
+                  style={{ width: 185, height: 42 }}
+                  placeholder="Code (TFZ-...)"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+                <button type="submit" className="btn btn-secondary btn-lg">
+                  Join
+                </button>
+              </form>
+            </div>
           </div>
 
-          <h1 style={{ fontSize: 'clamp(2.1rem, 4.5vw, 3.35rem)', lineHeight: 1.08 }}>
-            Your Personal{' '}
-            <span style={{ color: 'var(--accent-gold)' }}>AI Talk Show</span> &amp; Live Video Studio
-          </h1>
+          {/* Editorial Broadcast Studio Photography */}
+          <figure
+            style={{
+              margin: 0,
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              border: '1px solid var(--border-default)',
+              background: 'var(--bg-stage)',
+              boxShadow: 'var(--shadow-lg)',
+              position: 'relative',
+            }}
+          >
+            <img
+              src="/studio-hero.jpg"
+              alt="TFounZ acoustic dark-wood broadcast interview studio set with cinema camera and twin studio microphones"
+              style={{
+                width: '100%',
+                aspectRatio: '16 / 10',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'linear-gradient(180deg, rgba(7,7,9,0.04) 55%, rgba(7,7,9,0.72) 100%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <figcaption
+              style={{
+                position: 'absolute',
+                left: 16,
+                right: 16,
+                bottom: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                fontSize: '0.75rem',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                Multi-camera WebRTC stage &amp; live AI talent
+              </span>
+              <span className="mono" style={{ color: 'var(--accent)', fontSize: '0.72rem' }}>
+                SounZ AI · Filmy AI
+              </span>
+            </figcaption>
+          </figure>
+        </section>
 
-          <p style={{ fontSize: '1.08rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Forget boring grid-only video clones. Step onto the split-screen couch for{' '}
-            <strong>Chai with Karan AI</strong>, <strong>Midnight Hot Seat</strong>,{' '}
-            <strong>Anime Couch</strong>, or host live WebRTC audience rooms — then edit your episode
-            automatically with <strong>Filmy AI</strong> and dub character voices with{' '}
-            <strong>SounZ AI</strong>.
-          </p>
-
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
-            <Link to={isAuthenticated ? '/dashboard' : '/register'} className="btn btn-primary">
-              <Tv size={18} /> {isAuthenticated ? 'Open Control Room' : 'Start Your Show'}
-              <ArrowRight size={16} />
-            </Link>
-
-            <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
-              <input
-                className="input mono"
-                style={{ width: 205 }}
-                placeholder="Show Code (TFZ-...)"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-              <button type="submit" className="btn btn-ghost">
-                Join Stage
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      {/* Engine Triad */}
-      <section className="grid-3" style={{ marginBottom: 28 }}>
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Radio size={20} color="var(--accent-gold)" />
-            <h3>1. Live Talk Show + WebRTC</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.93rem', lineHeight: 1.55 }}>
-            Split-screen stage pairing your live camera &amp; WebRTC guest video with an audio-reactive
-            AI Host Avatar, 60-second Rapid-Fire round, studio soundboard, and Socket.IO audience chat.
-          </p>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Mic size={20} color="var(--accent-emerald)" />
-            <h3>2. SounZ AI Voice &amp; Audio Lab</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.93rem', lineHeight: 1.55 }}>
-            Record directly in the browser as PCM WAV and transform voices into Bollywood icons, anime
-            legends (Gojo, Shinchan, Goku), or run natural-language denoising &amp; BGM ducking.
-          </p>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Film size={20} color="var(--accent-cyan)" />
-            <h3>3. Filmy AI Video Director</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.93rem', lineHeight: 1.55 }}>
-            Record your composite TV broadcast with chyrons and send it straight to Filmy AI to trim,
-            denoise audio, apply cinema grades, and burn synchronized captions with plain English prompts.
-          </p>
-        </div>
-      </section>
-
-      {/* Presets Gallery */}
-      <section>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <h2 style={{ fontSize: '1.55rem' }}>Featured Show Formats</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem' }}>
-              Each format comes with a tailored Gemini Host personality, canvas avatar style &amp; SounZ AI voice
+        {/* Three-Column Production Architecture */}
+        <section
+          className="grid-3"
+          style={{
+            padding: '44px 0',
+            borderBottom: '1px solid var(--border-subtle)',
+            gap: 28,
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Users size={18} color="var(--accent)" />
+            <h2 style={{ fontSize: '1.05rem' }}>Live Studio &amp; Multi-Guest WebRTC</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.6 }}>
+              Host solo AI interviews or invite human guests and audience chat via unique show codes,
+              complete with screen sharing, Rapid-Fire rounds, and MongoDB attendance reports.
             </p>
           </div>
-          <span className="badge badge-gold">
-            <Sparkles size={13} /> 6 Studio Presets
-          </span>
-        </div>
 
-        <div className="grid-3">
-          {presets.map((preset) => (
-            <div key={preset.id} className="card card-compact" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span
-                  className="badge"
-                  style={{
-                    borderColor: `${preset.accentColor}66`,
-                    color: preset.accentColor,
-                  }}
-                >
-                  {preset.defaultMode === 'live-studio' ? <Users size={12} /> : <Tv size={12} />}
-                  {preset.defaultMode === 'live-studio' ? 'Live Studio' : 'AI Talk Show'}
-                </span>
-                <span className="mono" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  voice: {preset.sounzVoiceId}
-                </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <AudioLines size={18} color="var(--status-positive)" />
+            <h2 style={{ fontSize: '1.05rem' }}>SounZ AI Audio &amp; Character Voices</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.6 }}>
+              Synthesize live AI dialogue, record clean PCM WAV audio directly in the browser, apply
+              noise reduction, or transform voices with 38+ Bollywood and anime models.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Film size={18} color="var(--accent)" />
+            <h2 style={{ fontSize: '1.05rem' }}>Filmy AI Post-Production</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.6 }}>
+              Capture 1280×720 composite episodes with dynamic lower-third chyrons and send clips straight
+              to Filmy AI for auto-subtitles, noise cleanup, and pacing edits.
+            </p>
+          </div>
+        </section>
+
+        {/* Featured AI Talent Roster */}
+        {featuredRoster.length > 0 && (
+          <section style={{ paddingTop: 44 }}>
+            <div className="section-header">
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 6 }}>
+                  Casting Roster
+                </div>
+                <h2 style={{ fontSize: '1.35rem' }}>AI Hosts &amp; Celebrity Guests</h2>
               </div>
-              <h3 style={{ fontSize: '1.15rem' }}>{preset.showTitle}</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5 }}>
-                {preset.tagline}
-              </p>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 'auto', paddingTop: 6 }}>
-                Hosted by <strong style={{ color: 'var(--text-primary)' }}>{preset.name}</strong>
-              </div>
+              <Link to={isAuthenticated ? '/guests' : '/register'} className="btn btn-secondary btn-sm">
+                Explore Library <ArrowRight size={13} />
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
+
+            <div className="grid-3">
+              {featuredRoster.map((p) => (
+                <div key={p.id} className="surface-padded" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <PersonaPortrait styleKey={p.avatarStyle} size={46} />
+                    <div>
+                      <Badge tone={p.defaultAiRole === 'guest' ? 'accent' : 'neutral'}>
+                        {p.defaultAiRole === 'guest' ? 'AI Guest' : 'AI Host'}
+                      </Badge>
+                      <div style={{ fontWeight: 600, fontSize: '0.94rem', marginTop: 4 }}>{p.name}</div>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+                    {p.tagline}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
     </div>
   );
 }

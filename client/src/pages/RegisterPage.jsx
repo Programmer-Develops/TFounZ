@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
+import { ErrorBanner, Field } from '../components/ui/Primitives';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -32,109 +34,114 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="container page-shell">
-      <div className="card" style={{ maxWidth: 490, margin: '20px auto' }}>
-        <h1 style={{ fontSize: '1.75rem', marginBottom: 6 }}>Create Studio Account</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 18 }}>
-          Choose <strong>Host</strong> to launch AI Talk Shows &amp; meetings, or{' '}
-          <strong>Participant</strong> to join as a live guest.
-        </p>
-
-        {error && (
-          <div className="alert-error" style={{ marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label className="field-label" htmlFor="reg-name">
-              Full Name
-            </label>
-            <input
-              id="reg-name"
-              required
-              minLength={2}
-              className="input"
-              placeholder="Shantanu Pandya"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+      <Navbar />
+      <main className="container" style={{ paddingTop: 48, paddingBottom: 64 }}>
+        <div className="surface-padded" style={{ maxWidth: 460, margin: '0 auto', padding: 28 }}>
+          <div style={{ marginBottom: 20 }}>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>
+              New Creator Account
+            </div>
+            <h1 style={{ fontSize: '1.5rem' }}>Join TFounZ Studio</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: 4 }}>
+              Select <strong>Host</strong> to produce shows or <strong>Participant</strong> to join live rooms.
+            </p>
           </div>
 
-          <div>
-            <label className="field-label" htmlFor="reg-email">
-              Email Address
-            </label>
-            <input
-              id="reg-email"
-              type="email"
-              required
-              className="input"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
+          <div style={{ marginBottom: error ? 16 : 0 }}>
+            <ErrorBanner message={error} onDismiss={() => setError('')} />
           </div>
 
-          <div className="grid-2">
-            <div>
-              <label className="field-label" htmlFor="reg-password">
-                Password
-              </label>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <Field label="Full Name" htmlFor="reg-name">
               <input
-                id="reg-password"
-                type="password"
+                id="reg-name"
                 required
-                minLength={6}
+                minLength={2}
                 className="input"
-                placeholder="Min 6 chars"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="Your full name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
+            </Field>
+
+            <Field label="Email Address" htmlFor="reg-email">
+              <input
+                id="reg-email"
+                type="email"
+                required
+                autoComplete="email"
+                className="input"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </Field>
+
+            <div className="grid-2">
+              <Field label="Password" htmlFor="reg-password">
+                <input
+                  id="reg-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="input"
+                  placeholder="Min 6 characters"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Studio Role" htmlFor="reg-role">
+                <select
+                  id="reg-role"
+                  className="select"
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                >
+                  <option value="host">Host (Create Shows)</option>
+                  <option value="participant">Participant (Guest)</option>
+                </select>
+              </Field>
             </div>
-            <div>
-              <label className="field-label" htmlFor="reg-role">
-                Studio Role
-              </label>
-              <select
-                id="reg-role"
-                className="select"
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-              >
-                <option value="host">Host (Create &amp; Run Shows)</option>
-                <option value="participant">Participant (Guest / Audience)</option>
-              </select>
-            </div>
-          </div>
 
-          <div>
-            <label className="field-label" htmlFor="reg-bio">
-              Guest / Host Tagline (Optional)
-            </label>
-            <input
-              id="reg-bio"
-              maxLength={240}
-              className="input"
-              placeholder="Full-stack builder & talk show enthusiast"
-              value={form.bio}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-            />
-          </div>
+            <Field label="Creator Tagline (Optional)" htmlFor="reg-bio">
+              <input
+                id="reg-bio"
+                maxLength={240}
+                className="input"
+                placeholder="Host, filmmaker, or developer"
+                value={form.bio}
+                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              />
+            </Field>
 
-          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: 6 }}>
-            <UserPlus size={16} /> {submitting ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              disabled={submitting}
+              style={{ marginTop: 6, width: '100%' }}
+            >
+              <UserPlus size={15} /> {submitting ? 'Creating account...' : 'Create Account'}
+            </button>
+          </form>
 
-        <p style={{ marginTop: 18, fontSize: '0.88rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-          Already registered?{' '}
-          <Link to="/login" style={{ color: 'var(--accent-gold)', fontWeight: 600 }}>
-            Sign in
-          </Link>
-        </p>
-      </div>
+          <p
+            style={{
+              marginTop: 20,
+              fontSize: '0.84rem',
+              color: 'var(--text-secondary)',
+              textAlign: 'center',
+            }}
+          >
+            Already have an account?{' '}
+            <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

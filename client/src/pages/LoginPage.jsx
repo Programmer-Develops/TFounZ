@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogIn, Sparkles } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
+import { ErrorBanner, Field } from '../components/ui/Primitives';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -28,69 +30,76 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="container page-shell">
-      <div className="card" style={{ maxWidth: 460, margin: '28px auto' }}>
-        <div style={{ marginBottom: 20 }}>
-          <span className="badge badge-gold" style={{ marginBottom: 10 }}>
-            <Sparkles size={12} /> Studio Backstage Pass
-          </span>
-          <h1 style={{ fontSize: '1.75rem' }}>Sign In to TFounZ</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 4 }}>
-            Enter the Control Room, host shows, or join with a live show code.
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+      <Navbar />
+      <main className="container" style={{ paddingTop: 64, paddingBottom: 64 }}>
+        <div className="surface-padded" style={{ maxWidth: 420, margin: '0 auto', padding: 28 }}>
+          <div style={{ marginBottom: 22 }}>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>
+              Creator Access
+            </div>
+            <h1 style={{ fontSize: '1.5rem' }}>Sign in to TFounZ</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: 4 }}>
+              Enter your studio account to create shows or join a live broadcast.
+            </p>
+          </div>
+
+          <div style={{ marginBottom: error ? 16 : 0 }}>
+            <ErrorBanner message={error} onDismiss={() => setError('')} />
+          </div>
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <Field label="Email Address" htmlFor="login-email">
+              <input
+                id="login-email"
+                type="email"
+                required
+                autoComplete="email"
+                className="input"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </Field>
+
+            <Field label="Password" htmlFor="login-password">
+              <input
+                id="login-password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="input"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
+            </Field>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              disabled={submitting}
+              style={{ marginTop: 6, width: '100%' }}
+            >
+              <LogIn size={15} /> {submitting ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          <p
+            style={{
+              marginTop: 20,
+              fontSize: '0.84rem',
+              color: 'var(--text-secondary)',
+              textAlign: 'center',
+            }}
+          >
+            New to TFounZ Studio?{' '}
+            <Link to="/register" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+              Create an account
+            </Link>
           </p>
         </div>
-
-        {error && (
-          <div className="alert-error" style={{ marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label className="field-label" htmlFor="login-email">
-              Email Address
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              required
-              autoComplete="email"
-              className="input"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="login-password">
-              Password
-            </label>
-            <input
-              id="login-password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="input"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-          </div>
-
-          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: 6 }}>
-            <LogIn size={16} /> {submitting ? 'Signing In...' : 'Sign In'}
-          </button>
-        </form>
-
-        <p style={{ marginTop: 18, fontSize: '0.88rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-          New to TFounZ Studio?{' '}
-          <Link to="/register" style={{ color: 'var(--accent-gold)', fontWeight: 600 }}>
-            Create an account
-          </Link>
-        </p>
-      </div>
+      </main>
     </div>
   );
 }
